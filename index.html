@@ -468,6 +468,37 @@ nav { padding: 14px 10px; flex: 1; }
 .view-title { font-family:"Syne",sans-serif; font-size:16px; font-weight:700; margin-bottom:4px; }
 .view-sub   { font-size:12px; color:var(--text-3); font-family:"DM Mono",monospace; margin-bottom:16px; }
 
+
+/* MANTENIMIENTOS PANEL */
+.maint-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;display:none}
+.maint-panel.open{display:block}
+.maint-panel-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.maint-panel-title{font-size:14px;font-weight:500}
+.maint-panel-sub{font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;margin-top:2px}
+.maint-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)}
+.maint-row:last-child{border-bottom:none}
+.maint-row-left{}
+.maint-row-text{font-size:13px;color:var(--text);line-height:1.5;margin-bottom:5px}
+.maint-row-meta{font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.maint-row-actions{display:flex;gap:4px;flex-shrink:0}
+.m-pill{padding:2px 8px;border-radius:20px;font-size:10px;font-family:'DM Mono',monospace}
+.m-borrador{background:var(--amber-d);color:var(--amber)}
+.m-aprobado{background:var(--accent-d);color:var(--accent)}
+.m-rechazado{background:var(--red-d);color:var(--red)}
+.icon-btn-sm{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;border:0.5px solid transparent;background:transparent;cursor:pointer;color:var(--text-3);transition:all .15s}
+.icon-btn-sm svg{width:12px;height:12px;stroke:currentColor}
+.icon-btn-sm:hover{background:var(--surface2);border-color:var(--border);color:var(--text)}
+.icon-btn-sm.approve:hover{background:var(--accent-d);color:var(--accent)}
+.icon-btn-sm.reject:hover{background:var(--red-d);color:var(--red)}
+.icon-btn-sm.del:hover{background:var(--red-d);color:var(--red)}
+.maint-edit-form{margin-top:8px;display:none}
+.maint-edit-form.open{display:block}
+.maint-edit-textarea{width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:'DM Sans',sans-serif;resize:vertical;min-height:70px}
+.maint-edit-btns{display:flex;gap:6px;margin-top:6px;justify-content:flex-end}
+.m-role-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-family:'DM Mono',monospace}
+.m-role-op{background:var(--purple-d);color:var(--purple)}
+.m-role-adm{background:var(--amber-d);color:var(--amber)}
+
 /* Loading skeleton */
 .skeleton {
   background: linear-gradient(90deg, var(--surface2) 25%, var(--surface) 50%, var(--surface2) 75%);
@@ -578,6 +609,10 @@ nav { padding: 14px 10px; flex: 1; }
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         Usuarios
       </div>
+      <div class="nav-item admin-only" id="nav-mantenimientos" onclick="switchView('mantenimientos')" style="cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Mantenimientos
+      </div>
       <div class="nav-item admin-only" id="nav-auditoria" onclick="switchView('auditoria')" style="cursor:pointer">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
         Auditoría
@@ -680,6 +715,18 @@ nav { padding: 14px 10px; flex: 1; }
             </div>
           </div>
 
+          <!-- MANTENIMIENTOS PANEL -->
+          <div class="maint-panel" id="maint-panel">
+            <div class="maint-panel-hd">
+              <div>
+                <div class="maint-panel-title" id="maint-panel-title">🔧 Mantenimientos</div>
+                <div class="maint-panel-sub" id="maint-panel-sub">—</div>
+              </div>
+              <button class="btn btn-ghost" onclick="closeMaintPanel()" style="font-size:12px">✕ Cerrar</button>
+            </div>
+            <div id="maint-panel-body"></div>
+          </div>
+
           <!-- Toolbar -->
           <div class="toolbar">
             <div class="search-wrap">
@@ -753,6 +800,24 @@ nav { padding: 14px 10px; flex: 1; }
             <div class="th">Registrado</div>
           </div>
           <div id="users-body"><div class="empty-state" style="padding:24px">Cargando usuarios…</div></div>
+        </div>
+      </div>
+
+      <!-- VIEW: MANTENIMIENTOS -->
+      <div class="view" id="view-mantenimientos" style="display:none">
+        <div style="margin-bottom:16px">
+          <div class="view-title">Mantenimientos</div>
+          <div class="view-sub" id="mantenimientos-sub">Todos los registros de mantenimiento</div>
+        </div>
+        <div class="panel-card">
+          <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) 100px 120px;gap:8px;padding:9px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
+            <div class="th">Texto</div>
+            <div class="th">Tag</div>
+            <div class="th">Operador</div>
+            <div class="th">Estado</div>
+            <div class="th">Fecha</div>
+          </div>
+          <div id="mantenimientos-body"><div class="empty-state" style="padding:24px">Cargando…</div></div>
         </div>
       </div>
 
@@ -945,7 +1010,8 @@ async function loadData() {
 
   allLecturas = (data || []).map(r => ({
     id:      r.id,
-    tag:     r.tags?.nombre     || '—',
+    tag_id:  r.tags?.id         || null,
+  tag:     r.tags?.nombre     || '—',
     lugar:   r.tags?.lugar      || '—',
     uid:     r.tags?.uid        || '—',
     tagLat:  r.tags?.lat,
@@ -1042,7 +1108,13 @@ function renderTable() {
           <span class="pill-dot"></span>${r.estado}
         </span>
       </div>
-      <div>
+      <div style="display:flex;gap:4px">
+        <button class="icon-btn" title="Ver mantenimientos" style="color:var(--blue)"
+          onclick="event.stopPropagation();openMaintPanel('${r.tag_id}','${r.tag}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </button>
         <button class="icon-btn" title="Cambiar estado"
           onclick="event.stopPropagation();openModal('${r.id}','${r.estado}')"
           ${currentRole !== 'admin' ? 'disabled' : ''}>
@@ -1052,7 +1124,7 @@ function renderTable() {
           </svg>
         </button>
       </div>
-      <div>
+      <div style="display:flex;gap:4px">
         <button class="icon-btn" title="Eliminar lectura" style="color:var(--red-d)"
           onclick="event.stopPropagation();deleteLectura('${r.id}')"
           ${currentRole !== 'admin' ? 'disabled' : ''}
@@ -1285,7 +1357,7 @@ let currentView = 'tags';
 function switchView(name) {
   currentView = name;
   // Show/hide views
-  ['tags','usuarios','auditoria'].forEach(v => {
+  ['tags','usuarios','auditoria','mantenimientos'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.style.display = v === name ? 'block' : 'none';
   });
@@ -1294,11 +1366,12 @@ function switchView(name) {
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
   // Update topbar title
-  const titles = { tags:'Tags recientes', usuarios:'Usuarios', auditoria:'Auditoría' };
+  const titles = { tags:'Tags recientes', usuarios:'Usuarios', auditoria:'Auditoría', mantenimientos:'Mantenimientos' };
   const el = document.querySelector('.page-title');
   if (el) el.textContent = titles[name] || name;
   if (name === 'usuarios')  loadUsuarios();
   if (name === 'auditoria') loadAuditoria();
+  if (name === 'mantenimientos') loadMantenimientos();
 }
 
 /* ── DELETE LECTURA ────────────────────────────────── */
@@ -1333,12 +1406,38 @@ async function loadUsuarios() {
     <div class="panel-row users">
       <div style="font-size:13px;font-weight:500">${esc(u.nombre || '—')}</div>
       <div style="font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace">${esc(u.email || '—')}</div>
-      <div><span class="rol-badge ${u.rol === 'admin' ? 'rol-admin' : 'rol-user'}">${u.rol || 'user'}</span></div>
+      <div><span class="rol-badge ${u.rol === 'admin' ? 'rol-admin' : u.rol === 'operador' ? 'rol-badge m-role-op' : 'rol-user'}">${u.rol || 'user'}</span></div>
       <div style="font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace">${formatDate(u.created_at)}</div>
     </div>`).join('');
 }
 
 /* ── AUDITORÍA ─────────────────────────────────────── */
+
+async function loadMantenimientos() {
+  const body = document.getElementById('mantenimientos-body');
+  body.innerHTML = '<div class="empty-state" style="padding:24px">Cargando…</div>';
+  const { data, error } = await sb
+    .from('mantenimientos')
+    .select('id, texto, estado, created_at, tags(nombre), profiles(nombre, email, rol)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) { body.innerHTML = '<div class="empty-state" style="padding:24px">Error: '+error.message+'</div>'; return; }
+  if (!data?.length) { body.innerHTML = '<div class="empty-state" style="padding:24px">Sin registros</div>'; return; }
+  document.getElementById('mantenimientos-sub').textContent = data.length + ' registros';
+  const pills = { borrador:'m-borrador', aprobado:'m-aprobado', rechazado:'m-rechazado' };
+  body.innerHTML = data.map(m => {
+    const autor = m.profiles?.nombre || m.profiles?.email?.split('@')[0] || '—';
+    const fecha = new Date(m.created_at).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) 100px 120px;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border);align-items:center;font-size:12px">
+      <div style="color:var(--text);line-height:1.4">${esc(m.texto).substring(0,80)}${m.texto.length>80?'…':''}</div>
+      <div style="color:var(--text-3)">${esc(m.tags?.nombre||'—')}</div>
+      <div style="color:var(--text-3)">${esc(autor)}</div>
+      <div><span class="m-pill ${pills[m.estado]||''}">${m.estado}</span></div>
+      <div style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px">${fecha}</div>
+    </div>`;
+  }).join('');
+}
+
 async function loadAuditoria() {
   const body = document.getElementById('audit-body');
   body.innerHTML = '<div class="empty-state" style="padding:24px">Cargando…</div>';
@@ -1438,6 +1537,126 @@ async function sendInvite() {
 
   // Reload users list
   setTimeout(() => loadUsuarios(), 1500);
+}
+
+
+/* ── MANTENIMIENTOS DASHBOARD ──────────────────────── */
+let currentMaintTagId = null;
+
+async function openMaintPanel(tagId, tagName) {
+  if (!tagId || tagId === 'null') {
+    showToast('Tag no registrado en BD — sin mantenimientos', true);
+    return;
+  }
+  currentMaintTagId = tagId;
+  const panel = document.getElementById('maint-panel');
+  panel.classList.add('open');
+  document.getElementById('maint-panel-title').textContent = '🔧 ' + tagName;
+  document.getElementById('maint-panel-sub').textContent = 'Cargando registros…';
+  document.getElementById('maint-panel-body').innerHTML = '';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  await loadMaintPanel(tagId);
+}
+
+function closeMaintPanel() {
+  document.getElementById('maint-panel').classList.remove('open');
+  currentMaintTagId = null;
+}
+
+async function loadMaintPanel(tagId) {
+  const body = document.getElementById('maint-panel-body');
+  const { data, error } = await sb
+    .from('mantenimientos')
+    .select('id, texto, estado, created_at, updated_at, profiles(nombre, email, rol)')
+    .eq('tag_id', tagId)
+    .order('created_at', { ascending: false });
+
+  if (error) { body.innerHTML = '<div class="empty-state" style="padding:16px">Error: ' + error.message + '</div>'; return; }
+  if (!data?.length) {
+    body.innerHTML = '<div class="empty-state" style="padding:16px">Sin registros de mantenimiento para este tag</div>';
+    document.getElementById('maint-panel-sub').textContent = 'Sin registros';
+    return;
+  }
+
+  document.getElementById('maint-panel-sub').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
+
+  const isAdmin = currentRole === 'admin';
+  const pills = { borrador: 'm-borrador', aprobado: 'm-aprobado', rechazado: 'm-rechazado' };
+
+  body.innerHTML = data.map(m => {
+    const autor = m.profiles?.nombre || m.profiles?.email?.split('@')[0] || '—';
+    const rol   = m.profiles?.rol || 'user';
+    const fecha = new Date(m.created_at).toLocaleString('es-CL', {
+      day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'
+    });
+    const adminBtns = isAdmin ? `
+      <button class="icon-btn-sm approve" title="Aprobar" onclick="setMaintEstado('${m.id}','aprobado')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+      <button class="icon-btn-sm reject" title="Rechazar" onclick="setMaintEstado('${m.id}','rechazado')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <button class="icon-btn-sm" title="Editar" onclick="editMaint('${m.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="icon-btn-sm del" title="Eliminar" onclick="deleteMaint('${m.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>` : '';
+
+    return `
+    <div class="maint-row" id="mrow-${m.id}">
+      <div class="maint-row-left">
+        <div class="maint-row-text" id="mtext-${m.id}">${esc(m.texto)}</div>
+        <div class="maint-row-meta">
+          <span class="m-pill ${pills[m.estado]||''}">${m.estado}</span>
+          <span>${esc(autor)}</span>
+          <span class="m-role-badge ${rol==='admin'?'m-role-adm':'m-role-op'}">${rol}</span>
+          <span>${fecha}</span>
+        </div>
+        <div class="maint-edit-form" id="medit-${m.id}">
+          <textarea class="maint-edit-textarea" id="metxt-${m.id}">${esc(m.texto)}</textarea>
+          <div class="maint-edit-btns">
+            <button class="btn btn-ghost" style="font-size:11px" onclick="cancelEditMaint('${m.id}')">Cancelar</button>
+            <button class="btn btn-accent" style="font-size:11px" onclick="saveEditMaint('${m.id}')">Guardar</button>
+          </div>
+        </div>
+      </div>
+      <div class="maint-row-actions">${adminBtns}</div>
+    </div>`;
+  }).join('');
+}
+
+async function setMaintEstado(id, estado) {
+  const { error } = await sb.from('mantenimientos').update({ estado, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message, true); return; }
+  showToast('Estado actualizado a ' + estado);
+  await loadMaintPanel(currentMaintTagId);
+}
+
+function editMaint(id) {
+  const form = document.getElementById('medit-'+id);
+  const text = document.getElementById('mtext-'+id);
+  if (form) { form.classList.add('open'); text.style.display='none'; }
+}
+function cancelEditMaint(id) {
+  const form = document.getElementById('medit-'+id);
+  const text = document.getElementById('mtext-'+id);
+  if (form) { form.classList.remove('open'); text.style.display='block'; }
+}
+async function saveEditMaint(id) {
+  const txt = document.getElementById('metxt-'+id)?.value.trim();
+  if (!txt) return;
+  const { error } = await sb.from('mantenimientos').update({ texto: txt, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message, true); return; }
+  showToast('Registro actualizado');
+  await loadMaintPanel(currentMaintTagId);
+}
+async function deleteMaint(id) {
+  if (!confirm('¿Eliminar este registro de mantenimiento?')) return;
+  const { error } = await sb.from('mantenimientos').delete().eq('id', id);
+  if (error) { showToast('Error: ' + error.message, true); return; }
+  showToast('Registro eliminado');
+  await loadMaintPanel(currentMaintTagId);
 }
 
 function formatDate(iso) {

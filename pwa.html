@@ -66,7 +66,7 @@ body{overflow-x:hidden}
 .tab-pane.active{display:block}
 
 /* AUTO-READ SCREEN */
-#scr-reading{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center}
+#scr-reading{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);flex-direction:column;align-items:center;padding:20px 20px 40px;text-align:center;overflow-y:auto}
 #scr-reading.show{display:flex}
 .rd-circle{width:120px;height:120px;border-radius:50%;margin-bottom:24px;display:flex;align-items:center;justify-content:center;position:relative}
 .rd-circle.loading{background:var(--acd);border:1.5px solid rgba(79,255,176,.3);animation:rpulse 1.5s ease-in-out infinite}
@@ -108,6 +108,33 @@ body{overflow-x:hidden}
 .p-pend{background:var(--amd);color:var(--am)}.p-rev{background:var(--bld);color:var(--bl)}
 .p-apro{background:var(--acd);color:var(--ac)}.p-rech{background:var(--rdd);color:var(--rd)}
 .no-items{text-align:center;padding:24px;font-size:13px;color:var(--tx3)}
+
+
+/* MANTENIMIENTOS */
+.maint-section{width:100%;max-width:340px;margin-bottom:16px;text-align:left}
+.maint-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.maint-title{font-size:12px;font-weight:500;color:var(--tx);font-family:"DM Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+.maint-count{font-size:10px;color:var(--tx3);font-family:"DM Mono",monospace}
+.maint-item{background:var(--sf);border:1px solid var(--br);border-radius:10px;padding:12px;margin-bottom:8px}
+.maint-item.borrador{border-left:3px solid var(--am)}
+.maint-item.aprobado{border-left:3px solid var(--ac)}
+.maint-item.rechazado{border-left:3px solid var(--rd);opacity:.6}
+.maint-texto{font-size:13px;color:var(--tx);line-height:1.5;margin-bottom:6px}
+.maint-meta{font-size:10px;color:var(--tx3);font-family:"DM Mono",monospace;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.maint-estado{padding:1px 7px;border-radius:20px;font-size:10px;font-family:"DM Mono",monospace}
+.est-borrador{background:var(--amd);color:var(--am)}
+.est-aprobado{background:var(--acd);color:var(--ac)}
+.est-rechazado{background:var(--rdd);color:var(--rd)}
+.btn-add-maint{width:100%;padding:11px;background:var(--sf2);border:1px dashed rgba(255,255,255,0.15);border-radius:10px;color:var(--tx2);font-size:13px;cursor:pointer;transition:all .15s;margin-bottom:8px}
+.btn-add-maint:active{background:var(--br)}
+.maint-form{background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:14px;margin-bottom:8px;display:none}
+.maint-form.show{display:block}
+.maint-textarea{width:100%;padding:10px 12px;background:var(--sf2);border:1px solid var(--br);border-radius:8px;color:var(--tx);font-size:13px;font-family:"DM Sans",sans-serif;resize:vertical;min-height:90px;margin-bottom:10px;-webkit-appearance:none}
+.maint-textarea:focus{outline:none;border-color:rgba(79,255,176,.3)}
+.maint-form-btns{display:flex;gap:8px}
+.btn-maint-save{flex:1;padding:10px;background:var(--ac);color:#0c0e12;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:"Syne",sans-serif;cursor:pointer}
+.btn-maint-cancel{padding:10px 14px;background:transparent;border:1px solid var(--br);border-radius:8px;color:var(--tx2);font-size:13px;cursor:pointer}
+.no-maint{text-align:center;padding:16px;font-size:12px;color:var(--tx3);font-family:"DM Mono",monospace}
 
 /* ADMIN TAB */
 .adm-card{background:var(--sf);border:1px solid var(--br);border-radius:14px;padding:16px;margin-bottom:14px}
@@ -210,6 +237,28 @@ body{overflow-x:hidden}
     <div class="rd-row"><span class="rd-k">Hora</span><span class="rd-v" id="rd-hora">—</span></div>
     <div class="rd-row"><span class="rd-k">Estado</span><span class="rd-v" id="rd-estado" style="color:var(--am)">pendiente</span></div>
   </div>
+  <!-- MAINTENANCE SECTION -->
+  <div class="maint-section" id="maint-section" style="display:none">
+    <div class="maint-hd">
+      <span class="maint-title">🔧 Mantenimiento</span>
+      <span class="maint-count" id="maint-count"></span>
+    </div>
+    <div id="maint-list"></div>
+
+    <div class="maint-form" id="maint-form">
+      <div style="font-size:12px;color:var(--tx2);margin-bottom:8px">Nuevo registro de mantenimiento</div>
+      <textarea class="maint-textarea" id="maint-texto" placeholder="Describe el trabajo realizado…"></textarea>
+      <div class="maint-form-btns">
+        <button class="btn-maint-cancel" onclick="cancelMaint()">Cancelar</button>
+        <button class="btn-maint-save" id="btn-maint-save" onclick="saveMaint()">Guardar registro</button>
+      </div>
+    </div>
+
+    <button class="btn-add-maint" id="btn-add-maint" onclick="showMaintForm()">
+      + Agregar registro de mantenimiento
+    </button>
+  </div>
+
   <button class="btn-home" onclick="goHome()">Ir al inicio</button>
 </div>
 
@@ -318,6 +367,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let currentRole = 'user';
 let pendingUID  = null;   // UID from URL when not yet logged in
+let currentTagId = null; // tag_id of last scanned tag
 
 /* ======================================================
    INIT — detect tag from URL first
@@ -416,7 +466,7 @@ async function loginMagic() {
   if (!email) return showAlert('e','Ingresa tu correo');
   const {error} = await sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: 'https://dilbert008.github.io/NFC_tracker/pwa.html', shouldCreateUser: true }
+    options: { emailRedirectTo: 'https://IoTeknica.github.io/NFC_tracker/pwa.html', shouldCreateUser: true }
   });
   if (error) showAlert('e', error.message);
   else showAlert('o','✓ Revisa tu correo — te enviamos el magic link');
@@ -503,6 +553,18 @@ async function processTagRead(uid) {
   }
 
   loadHistory();
+
+  // Load maintenance records for this tag
+  if (tag?.id) {
+    currentTagId = tag.id;
+    await loadMaintenance(tag.id);
+    qs('#maint-section').style.display = 'block';
+    // Show add button only for operador and admin
+    const canAdd = ['admin','operador'].includes(currentRole);
+    qs('#btn-add-maint').style.display = canAdd ? 'block' : 'none';
+  } else {
+    qs('#maint-section').style.display = 'none';
+  }
 }
 
 function setReadState(state, title, sub) {
@@ -566,6 +628,85 @@ async function savePassword() {
     pendingUID = null;
     await processTagRead(uid);
   }
+}
+
+
+/* ── MANTENIMIENTOS ─────────────────────────────────── */
+async function loadMaintenance(tagId) {
+  const list = qs('#maint-list');
+  if (!list) return;
+  list.innerHTML = '<div class="no-maint">Cargando…</div>';
+
+  const { data, error } = await sb
+    .from('mantenimientos')
+    .select('id, texto, estado, created_at, profiles(nombre, email)')
+    .eq('tag_id', tagId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error || !data?.length) {
+    list.innerHTML = '<div class="no-maint">Sin registros de mantenimiento</div>';
+    qs('#maint-count').textContent = '';
+    return;
+  }
+
+  qs('#maint-count').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
+
+  list.innerHTML = data.map(m => {
+    const autor = m.profiles?.nombre || m.profiles?.email?.split('@')[0] || '—';
+    const fecha = new Date(m.created_at).toLocaleString('es-CL', {
+      day:'2-digit', month:'2-digit', year:'2-digit',
+      hour:'2-digit', minute:'2-digit'
+    });
+    return `
+    <div class="maint-item ${m.estado}">
+      <div class="maint-texto">${esc(m.texto)}</div>
+      <div class="maint-meta">
+        <span class="maint-estado est-${m.estado}">${m.estado}</span>
+        <span>${esc(autor)}</span>
+        <span>${fecha}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showMaintForm() {
+  qs('#maint-form').classList.add('show');
+  qs('#btn-add-maint').style.display = 'none';
+  qs('#maint-texto').focus();
+}
+
+function cancelMaint() {
+  qs('#maint-form').classList.remove('show');
+  qs('#maint-texto').value = '';
+  qs('#btn-add-maint').style.display = 'block';
+}
+
+async function saveMaint() {
+  const texto = qs('#maint-texto').value.trim();
+  if (!texto) { qs('#maint-texto').focus(); return; }
+  if (!currentTagId) return;
+
+  const btn = qs('#btn-maint-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  const { error } = await sb.from('mantenimientos').insert({
+    tag_id:  currentTagId,
+    user_id: currentUser.id,
+    texto,
+    estado:  'borrador'
+  });
+
+  btn.disabled = false; btn.textContent = 'Guardar registro';
+
+  if (error) {
+    alert('Error: ' + error.message); return;
+  }
+
+  qs('#maint-texto').value = '';
+  qs('#maint-form').classList.remove('show');
+  qs('#btn-add-maint').style.display = 'block';
+  await loadMaintenance(currentTagId);
 }
 
 function goHome() {
