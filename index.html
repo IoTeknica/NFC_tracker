@@ -25,8 +25,8 @@
   --border:    rgba(255,255,255,0.07);
   --border-h:  rgba(255,255,255,0.13);
   --text:      #eceef2;
-  --text-2:    #7c8190;
-  --text-3:    #454954;
+  --text-2:    #a0a8b4;
+  --text-3:    #6b7280;
   --accent:    #4fffb0;
   --accent-d:  rgba(79,255,176,0.12);
   --amber:     #ffb84f;
@@ -285,9 +285,9 @@ nav { padding: 14px 10px; flex: 1; }
   transition: border-color .2s;
 }
 .kpi-card:hover { border-color: var(--border-h); }
-.kpi-lbl { font-size: 10px; color: var(--text-3); letter-spacing: .08em; text-transform: uppercase; font-family: 'DM Mono', monospace; margin-bottom: 8px; }
+.kpi-lbl { font-size: 11px; color: var(--text-2); letter-spacing: .06em; text-transform: uppercase; font-family: 'DM Mono', monospace; margin-bottom: 8px; }
 .kpi-val { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.kpi-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+.kpi-sub { font-size: 11px; color: var(--text-2); margin-top: 4px; font-family: 'DM Mono', monospace; }
 
 /* Split: mapa + tabla */
 .split { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
@@ -306,7 +306,7 @@ nav { padding: 14px 10px; flex: 1; }
 .map-title svg { width: 14px; height: 14px; stroke: var(--accent); }
 #mapC { width: 100%; height: 290px; }
 .map-legend { display: flex; flex-direction: column; gap: 5px; padding: 10px 14px; border-top: 1px solid var(--border); }
-.leg-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); font-family: 'DM Mono', monospace; }
+.leg-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); font-family: 'DM Mono', monospace; }
 .leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 .leaflet-popup-content-wrapper {
@@ -407,7 +407,7 @@ nav { padding: 14px 10px; flex: 1; }
   padding: 9px 16px; gap: 8px;
   background: var(--surface2); border-bottom: 1px solid var(--border);
 }
-.th { font-size: 10px; color: var(--text-3); font-family: 'DM Mono', monospace; letter-spacing: .05em; }
+.th { font-size: 11px; color: var(--text-2); font-family: 'DM Mono', monospace; letter-spacing: .05em; font-weight: 500; }
 .t-row {
   display: grid;
   grid-template-columns: minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.1fr) 100px 80px 36px 36px;
@@ -420,11 +420,11 @@ nav { padding: 14px 10px; flex: 1; }
 .t-row:hover { background: var(--surface2); }
 .t-row.selected { background: var(--blue-d); border-left: 2px solid var(--blue); padding-left: 14px; }
 .tag-n { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tag-s { font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag-s { font-size: 11px; color: var(--text-2); font-family: 'DM Mono', monospace; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tag-uid-badge { display:inline-block; margin-top:3px; font-size:10px; font-family:'DM Mono',monospace; background:var(--accent-d); color:var(--accent); border-radius:4px; padding:1px 6px; }
-.lugar-cell { font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lugar-cell { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500; }
 .lugar-cell-sub { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:2px; }
-.user-n { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-n { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 .user-r { font-size: 10px; font-family: 'DM Mono', monospace; margin-top: 1px; }
 .pill {
   display: inline-flex; align-items: center; gap: 4px;
@@ -436,7 +436,7 @@ nav { padding: 14px 10px; flex: 1; }
 .s-revisado  { background: var(--blue-d);    color: var(--blue); }
 .s-aprobado  { background: var(--accent-d);  color: var(--accent); }
 .s-rechazado { background: var(--red-d);     color: var(--red); }
-.coords { font-size: 10px; color: var(--text-3); font-family: 'DM Mono', monospace; line-height: 1.6; }
+.coords { font-size: 11px; color: var(--text-2); font-family: 'DM Mono', monospace; line-height: 1.6; }
 .icon-btn {
   width: 28px; height: 28px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
@@ -447,6 +447,19 @@ nav { padding: 14px 10px; flex: 1; }
 .icon-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
 .icon-btn:disabled { opacity: .3; cursor: default; }
 
+
+
+/* HISTORIAL COMPLETO */
+.hist-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end}
+.hist-filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+.hist-filter-label{font-size:10px;color:var(--text-2);font-family:'DM Mono',monospace;letter-spacing:.05em;text-transform:uppercase}
+.hist-filter-input{padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:'DM Sans',sans-serif;width:100%}
+.hist-filter-input:focus{outline:none;border-color:var(--border-hover)}
+.hist-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.hist-chip{padding:5px 12px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s}
+.hist-chip:hover{border-color:var(--border-hover);color:var(--text)}
+.hist-chip.on{background:var(--accent-d);color:var(--accent);border-color:rgba(79,255,176,.3)}
+.hist-summary{font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;margin-bottom:10px}
 
 /* VIEWS */
 .view { display: none; }
@@ -479,7 +492,7 @@ nav { padding: 14px 10px; flex: 1; }
 .maint-row:last-child{border-bottom:none}
 .maint-row-left{}
 .maint-row-text{font-size:13px;color:var(--text);line-height:1.5;margin-bottom:5px}
-.maint-row-meta{font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.maint-row-meta{font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .maint-row-actions{display:flex;gap:4px;flex-shrink:0}
 .m-pill{padding:2px 8px;border-radius:20px;font-size:10px;font-family:'DM Mono',monospace}
 .m-borrador{background:var(--amber-d);color:var(--amber)}
@@ -599,7 +612,7 @@ nav { padding: 14px 10px; flex: 1; }
         Tags recientes
         <span class="nav-badge green" id="nav-count">—</span>
       </div>
-      <div class="nav-item">
+      <div class="nav-item" id="nav-historial" onclick="switchView('historial')" style="cursor:pointer">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
         Historial completo
       </div>
@@ -758,6 +771,56 @@ nav { padding: 14px 10px; flex: 1; }
         </div>
       </div>
     </div>
+
+      <!-- VIEW: HISTORIAL COMPLETO -->
+      <div class="view" id="view-historial" style="display:none">
+        <div style="margin-bottom:14px">
+          <div class="view-title">Historial completo de lecturas</div>
+          <div class="view-sub" id="hist-sub">Filtra por tag, lugar, usuario o fecha</div>
+        </div>
+
+        <div class="hist-filters">
+          <div class="hist-filter-group">
+            <div class="hist-filter-label">Buscar</div>
+            <input class="hist-filter-input search-input" type="text" id="hist-q"
+              placeholder="Tag, lugar o usuario…" oninput="filterHistorial()">
+          </div>
+          <div class="hist-filter-group" style="max-width:150px">
+            <div class="hist-filter-label">Desde</div>
+            <input class="hist-filter-input" type="date" id="hist-desde" onchange="filterHistorial()">
+          </div>
+          <div class="hist-filter-group" style="max-width:150px">
+            <div class="hist-filter-label">Hasta</div>
+            <input class="hist-filter-input" type="date" id="hist-hasta" onchange="filterHistorial()">
+          </div>
+          <button class="btn btn-ghost" onclick="clearHistFilters()" style="font-size:12px;align-self:flex-end">
+            Limpiar filtros
+          </button>
+        </div>
+
+        <div class="hist-chips" id="hist-estado-chips">
+          <span class="hist-chip" onclick="toggleHistChip(this,'pendiente')">⏳ pendiente</span>
+          <span class="hist-chip" onclick="toggleHistChip(this,'revisado')">👁 revisado</span>
+          <span class="hist-chip" onclick="toggleHistChip(this,'aprobado')">✓ aprobado</span>
+          <span class="hist-chip" onclick="toggleHistChip(this,'rechazado')">✕ rechazado</span>
+        </div>
+
+        <div class="hist-summary" id="hist-summary"></div>
+
+        <div class="table-wrap">
+          <div class="t-head" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
+            <div class="th" onclick="sortHistorial('tag')" style="cursor:pointer">Tag ↕</div>
+            <div class="th" onclick="sortHistorial('lugar')" style="cursor:pointer">Lugar ↕</div>
+            <div class="th" onclick="sortHistorial('user')" style="cursor:pointer">Usuario ↕</div>
+            <div class="th" onclick="sortHistorial('hora')" style="cursor:pointer">Fecha y hora ↕</div>
+            <div class="th">Estado</div>
+            <div class="th"></div>
+          </div>
+          <div id="hist-body">
+            <div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>Cargando historial…</div>
+          </div>
+        </div>
+      </div>
 
       <!-- VIEW: USUARIOS -->
       <div class="view" id="view-usuarios" style="display:none">
@@ -1201,10 +1264,15 @@ async function guardarEstado() {
   }
 
   const r = allLecturas.find(x => x.id === editId);
+  // Update in allLecturas (tags view)
   if (r) r.estado = selSt;
+  // Update in allHistorial (historial view)
+  const rh = allHistorial.find(x => x.id === editId);
+  if (rh) rh.estado = selSt;
   closeModal();
   renderTable(); drawMap(); updateKPIs();
-  showToast(`"${r?.tag}" → estado actualizado a ${selSt}`);
+  if (currentView === 'historial') filterHistorial();
+  showToast(`"${r?.tag || rh?.tag}" → estado actualizado a ${selSt}`);
 }
 
 let toastTimer;
@@ -1253,9 +1321,9 @@ function initLeafletMap() {
     zoomControl: true
   });
   L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     {
-      attribution: '© <a href="https://openstreetmap.org">OSM</a> © <a href="https://carto.com">CARTO</a>',
+      attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> © <a href="https://carto.com">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19
     }
@@ -1352,12 +1420,165 @@ function showApp()     { document.getElementById('login-screen').style.display =
    ARRANQUE
    ============================================================= */
 
+
+/* ── HISTORIAL COMPLETO ──────────────────────────── */
+let allHistorial  = [];
+let histSort      = { col: 'hora', dir: 'desc' };
+let histEstados   = new Set();
+
+async function loadHistorial() {
+  const body = document.getElementById('hist-body');
+  body.innerHTML = '<div class="empty-state">Cargando…</div>';
+
+  const { data, error } = await sb
+    .from('lecturas')
+    .select(`
+      id, lat, lng, estado, leido_en,
+      tags!lecturas_tag_id_fkey ( id, nombre, lugar, uid ),
+      profiles!lecturas_user_id_fkey ( id, nombre, rol, email )
+    `)
+    .order('leido_en', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    body.innerHTML = '<div class="empty-state">Error: ' + error.message + '</div>';
+    return;
+  }
+
+  allHistorial = (data || []).map(r => ({
+    id:      r.id,
+    tag:     r.tags?.nombre     || '—',
+    tag_id:  r.tags?.id         || null,
+    lugar:   r.tags?.lugar      || '—',
+    uid:     r.tags?.uid        || '—',
+    user:    r.profiles?.nombre || r.profiles?.email?.split('@')[0] || '—',
+    rol:     r.profiles?.rol    || 'user',
+    estado:  r.estado           || 'pendiente',
+    hora:    r.leido_en         || '',
+    horaFmt: formatDate(r.leido_en),
+    lat:     r.lat,
+    lng:     r.lng,
+  }));
+
+  filterHistorial();
+}
+
+function filterHistorial() {
+  const q      = (document.getElementById('hist-q')?.value || '').toLowerCase();
+  const desde  = document.getElementById('hist-desde')?.value;
+  const hasta  = document.getElementById('hist-hasta')?.value;
+
+  let rows = allHistorial.filter(r => {
+    if (q && ![r.tag, r.lugar, r.user, r.uid].join(' ').toLowerCase().includes(q)) return false;
+    if (histEstados.size > 0 && !histEstados.has(r.estado)) return false;
+    if (desde && r.hora < desde) return false;
+    if (hasta && r.hora.substring(0,10) > hasta) return false;
+    return true;
+  });
+
+  // Sort
+  rows.sort((a, b) => {
+    let av = a[histSort.col] || '', bv = b[histSort.col] || '';
+    return histSort.dir === 'asc'
+      ? av.localeCompare(bv)
+      : bv.localeCompare(av);
+  });
+
+  document.getElementById('hist-summary').textContent =
+    rows.length + ' lectura' + (rows.length !== 1 ? 's' : '') +
+    ' de ' + allHistorial.length + ' totales';
+
+  renderHistorial(rows);
+}
+
+function renderHistorial(rows) {
+  const body = document.getElementById('hist-body');
+  if (!rows.length) {
+    body.innerHTML = '<div class="empty-state" style="padding:28px">Sin lecturas para este filtro</div>';
+    return;
+  }
+
+  const stColors = {
+    pendiente: 's-pendiente', revisado: 's-revisado',
+    aprobado:  's-aprobado',  rechazado: 's-rechazado'
+  };
+
+  body.innerHTML = rows.map(r => `
+    <div class="t-row" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
+      <div>
+        <div class="tag-n">${esc(r.tag)}</div>
+        <div class="tag-uid-badge" style="margin-top:2px">${esc(r.uid)}</div>
+      </div>
+      <div class="lugar-cell">${esc(r.lugar)}</div>
+      <div>
+        <div class="user-n">${esc(r.user)}</div>
+        <div class="user-r" style="color:${r.rol==='admin'?'var(--amber)':r.rol==='operador'?'var(--purple)':'var(--text-3)'}">
+          ${r.rol}
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;line-height:1.5">
+        ${r.horaFmt}
+      </div>
+      <div><span class="pill ${stColors[r.estado]||''}">${r.estado}</span></div>
+      <div>
+        <button class="icon-btn" title="Cambiar estado"
+          onclick="openHistModal('${r.id}','${r.estado}')"
+          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function openHistModal(id, estado) {
+  // Reuse existing modal
+  editId = id; selSt = estado;
+  const r = allHistorial.find(x => x.id === id);
+  document.getElementById('modal-sub').textContent = (r?.tag || '—') + ' · ' + (r?.lugar || '—');
+  document.getElementById('modal').classList.add('open');
+  highlightOpt(estado);
+  document.getElementById('modal').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function toggleHistChip(el, estado) {
+  if (histEstados.has(estado)) {
+    histEstados.delete(estado);
+    el.classList.remove('on');
+  } else {
+    histEstados.add(estado);
+    el.classList.add('on');
+  }
+  filterHistorial();
+}
+
+function sortHistorial(col) {
+  if (histSort.col === col) {
+    histSort.dir = histSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    histSort = { col, dir: 'asc' };
+  }
+  filterHistorial();
+}
+
+function clearHistFilters() {
+  document.getElementById('hist-q').value     = '';
+  document.getElementById('hist-desde').value = '';
+  document.getElementById('hist-hasta').value = '';
+  histEstados.clear();
+  document.querySelectorAll('.hist-chip').forEach(c => c.classList.remove('on'));
+  histSort = { col: 'hora', dir: 'desc' };
+  filterHistorial();
+}
+
 /* ── VIEW SWITCHER ─────────────────────────────────── */
 let currentView = 'tags';
 function switchView(name) {
   currentView = name;
   // Show/hide views
-  ['tags','usuarios','auditoria','mantenimientos'].forEach(v => {
+  ['tags','historial','usuarios','auditoria','mantenimientos'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.style.display = v === name ? 'block' : 'none';
   });
@@ -1366,9 +1587,10 @@ function switchView(name) {
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
   // Update topbar title
-  const titles = { tags:'Tags recientes', usuarios:'Usuarios', auditoria:'Auditoría', mantenimientos:'Mantenimientos' };
+  const titles = { tags:'Tags recientes', historial:'Historial completo', usuarios:'Usuarios', auditoria:'Auditoría', mantenimientos:'Mantenimientos' };
   const el = document.querySelector('.page-title');
   if (el) el.textContent = titles[name] || name;
+  if (name === 'historial') loadHistorial();
   if (name === 'usuarios')  loadUsuarios();
   if (name === 'auditoria') loadAuditoria();
   if (name === 'mantenimientos') loadMantenimientos();
