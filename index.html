@@ -175,8 +175,19 @@ body::before {
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
 }
+/* Logo de IoTeknica en la esquina superior izquierda. Corre el resto
+   del menu hacia abajo. max-height + max-width con width/height auto
+   deja que se acomode solo sea el logo cuadrado o un wordmark ancho,
+   sin deformarse; 22px lo empareja con el alto de "NFC Tracker". */
+.brand { padding: 18px 18px 0; display: flex; align-items: center; }
+.brand-logo {
+  max-height: 40px; max-width: 100%;
+  width: auto; height: auto; display: block;
+  /* Si el archivo faltara, el navegador muestra el alt como texto */
+  font-family: 'Syne', sans-serif; font-size: 13px; color: var(--text-2);
+}
 .logo {
-  padding: 22px 18px 18px;
+  padding: 14px 18px 18px;
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 10px;
 }
@@ -642,6 +653,12 @@ nav { padding: 14px 10px; flex: 1; }
 <!-- ===== APP ===== -->
 <div id="app">
   <aside class="sidebar">
+    <div class="brand">
+      <!-- Servido a 123x40; el archivo es 3x (369x120) para pantallas retina -->
+      <img class="brand-logo" src="ioteknica-logo.png" alt="IoTeknica"
+           width="123" height="40" decoding="async">
+    </div>
+
     <div class="logo">
       <div class="logo-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

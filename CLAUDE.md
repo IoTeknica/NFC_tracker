@@ -20,6 +20,15 @@ HTML autocontenidos (HTML + CSS + JS inline) que hablan directo con Supabase
 via `@supabase/supabase-js@2` cargado por CDN. Cualquier cambio se despliega
 subiendo el archivo a GitHub.
 
+El unico recurso externo propio es `ioteknica-logo.png`, el logo de la barra
+lateral del dashboard. Va junto a los HTML y se referencia con ruta relativa;
+si se mueve o no se sube, el `<img>` cae al texto del `alt`. El archivo esta
+a 3x (369x120) para pantallas retina y se muestra a 123x40. Se genero a
+partir del logo original de IoTeknica: se le quito el fondo blanco (venia
+opaco, sin canal alfa util), se recoloreo el azul marino a `--text` porque
+sobre fondo oscuro no se leia, y se recorto el descriptor "CONSULTORIA",
+ilegible a este tamano.
+
 ## URLs en produccion
 
 | Recurso | URL |

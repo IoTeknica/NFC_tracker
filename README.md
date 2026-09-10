@@ -13,9 +13,10 @@ de mantenimiento en terreno.
 | `pwa.html` | App movil — lectura de tags y registro de mantenimientos |
 | `schema.sql` | Esquema de Supabase con politicas RLS |
 | `CLAUDE.md` | Contexto tecnico del proyecto |
+| `ioteknica-logo.png` | Logo de la barra lateral del dashboard |
 
-Sin build step. Los dos HTML son autocontenidos y se despliegan subiendolos
-a GitHub Pages.
+Sin build step. Los HTML son autocontenidos salvo por el logo, que va como
+archivo aparte junto a ellos; todo se despliega subiendolo a GitHub Pages.
 
 ## Desplegar
 
