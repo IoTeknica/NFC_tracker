@@ -305,10 +305,39 @@ nav { padding: 14px 10px; flex: 1; }
 .map-title { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; color: var(--text); }
 .map-title svg { width: 14px; height: 14px; stroke: var(--accent); }
 #mapC { width: 100%; height: 290px; }
-#mapC .leaflet-layer,
-#mapC .leaflet-tile-pane { 
+#mapH { width: 100%; height: 300px; }
+#mapC .leaflet-layer, #mapC .leaflet-tile-pane,
+#mapH .leaflet-layer, #mapH .leaflet-tile-pane {
   filter: brightness(0.78) saturate(0.72) contrast(1.08) sepia(0.10);
 }
+
+/* ── Mapa fijo del historial ─────────────────────────────
+   El mapa acompana el scroll de la tabla en vez de perderse arriba.
+   Va con position:sticky, no fixed — fixed no funciona dentro del
+   iframe del preview (ver CLAUDE.md), pero sticky si: el .topbar ya
+   lo usa. El contenedor que scrollea es .main, y 74px es el alto del
+   topbar, que queda sticky por encima.                              */
+.hist-split { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+.hist-map-card { position: sticky; top: 74px; z-index: 5; }
+
+@media (min-width: 1100px) {
+  .hist-split { grid-template-columns: 360px minmax(0, 1fr); }
+}
+/* Angosto: el mapa se apila arriba y se achica para no comerse la pantalla */
+@media (max-width: 1099px) {
+  #mapH { height: 190px; }
+}
+
+.hist-map-empty {
+  padding: 22px 14px; text-align: center;
+  font-size: 12px; color: var(--text-3); font-family: 'DM Mono', monospace;
+}
+/* Leyenda horizontal: en el mapa fijo el alto es lo que escasea */
+.hist-map-card .map-legend {
+  flex-direction: row; flex-wrap: wrap; gap: 10px;
+  padding: 8px 14px;
+}
+.hist-map-card .leg-row { font-size: 11px; }
 .map-legend { display: flex; flex-direction: column; gap: 5px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .leg-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); font-family: 'DM Mono', monospace; }
 .leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -347,7 +376,18 @@ nav { padding: 14px 10px; flex: 1; }
   background: var(--accent-d); border: 1px solid rgba(79,255,176,.2);
   color: var(--accent); font-size: 12px; font-family: 'DM Mono', monospace;
 }
-.toast.show { display: flex; }
+.toast.show { display: flex; margin-bottom: 10px; }
+
+/* Ranura compartida para el toast y el modal de estado.
+   Antes vivian dentro de #view-tags, que switchView() oculta con
+   display:none — por eso desde el historial el modal se abria pero no
+   se veia. Aca quedan fuera de todas las vistas y sticky, asi que se
+   ven desde cualquiera y sin importar donde este el scroll. */
+.overlay-slot {
+  position: sticky; top: 74px; z-index: 20;
+  display: flex; flex-direction: column;
+}
+.overlay-slot .modal-wrap, .overlay-slot .toast { max-width: 520px; }
 .toast svg { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
 
 /* Modal estado */
@@ -357,7 +397,10 @@ nav { padding: 14px 10px; flex: 1; }
   border: 1px solid var(--border-h);
   border-radius: 14px; padding: 18px;
 }
-.modal-wrap.open { display: block; }
+.modal-wrap.open { display: block; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
+/* Pill de estado clickeable en el historial (solo admin) */
+.pill-edit { cursor: pointer; }
+.pill-edit:hover { filter: brightness(1.25); outline: 1px solid var(--border-h); outline-offset: 1px; }
 .modal-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
 .modal-sub { font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace; margin-bottom: 14px; }
 .estado-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 14px; }
@@ -450,6 +493,9 @@ nav { padding: 14px 10px; flex: 1; }
 .icon-btn svg { width: 13px; height: 13px; stroke: currentColor; }
 .icon-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
 .icon-btn:disabled { opacity: .3; cursor: default; }
+.icon-btn.danger { color: var(--red-d); }
+.icon-btn.danger:hover:not(:disabled) { color: var(--red); background: var(--red-d); border-color: rgba(255,95,95,.25); }
+.row-actions { display: flex; gap: 4px; }
 
 
 
@@ -672,6 +718,38 @@ nav { padding: 14px 10px; flex: 1; }
     </div>
 
     <div class="content">
+      <!-- Ranura compartida: visible desde cualquier vista -->
+      <div class="overlay-slot">
+          <div class="toast" id="toast">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="toast-msg"></span>
+          </div>
+
+          <!-- Modal estado -->
+          <div class="modal-wrap" id="modal">
+            <div class="modal-title">Cambiar estado</div>
+            <div class="modal-sub" id="modal-sub">—</div>
+            <div class="estado-grid">
+              <div class="estado-opt" id="opt-pendiente" onclick="selEstado('pendiente')">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>pendiente
+              </div>
+              <div class="estado-opt" id="opt-revisado" onclick="selEstado('revisado')">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>revisado
+              </div>
+              <div class="estado-opt" id="opt-aprobado" onclick="selEstado('aprobado')">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>aprobado
+              </div>
+              <div class="estado-opt" id="opt-rechazado" onclick="selEstado('rechazado')">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>rechazado
+              </div>
+            </div>
+            <div class="modal-btns">
+              <button class="btn" onclick="closeModal()">Cancelar</button>
+              <button class="btn btn-accent" id="btn-save-estado" onclick="guardarEstado()">Guardar cambio</button>
+            </div>
+          </div>
+      </div>
+
       <!-- VIEW: TAGS RECIENTES -->
       <div class="view active" id="view-tags">
       <!-- KPIs -->
@@ -703,35 +781,6 @@ nav { padding: 14px 10px; flex: 1; }
 
         <!-- Columna derecha -->
         <div class="right-col">
-          <div class="toast" id="toast">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            <span id="toast-msg"></span>
-          </div>
-
-          <!-- Modal estado -->
-          <div class="modal-wrap" id="modal">
-            <div class="modal-title">Cambiar estado</div>
-            <div class="modal-sub" id="modal-sub">—</div>
-            <div class="estado-grid">
-              <div class="estado-opt" id="opt-pendiente" onclick="selEstado('pendiente')">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>pendiente
-              </div>
-              <div class="estado-opt" id="opt-revisado" onclick="selEstado('revisado')">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>revisado
-              </div>
-              <div class="estado-opt" id="opt-aprobado" onclick="selEstado('aprobado')">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>aprobado
-              </div>
-              <div class="estado-opt" id="opt-rechazado" onclick="selEstado('rechazado')">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>rechazado
-              </div>
-            </div>
-            <div class="modal-btns">
-              <button class="btn" onclick="closeModal()">Cancelar</button>
-              <button class="btn btn-accent" id="btn-save-estado" onclick="guardarEstado()">Guardar cambio</button>
-            </div>
-          </div>
-
           <!-- MANTENIMIENTOS PANEL -->
           <div class="maint-panel" id="maint-panel">
             <div class="maint-panel-hd">
@@ -811,6 +860,28 @@ nav { padding: 14px 10px; flex: 1; }
 
         <div class="hist-summary" id="hist-summary"></div>
 
+        <div class="hist-split">
+        <!-- Mapa fijo: acompaña el scroll de la tabla -->
+        <div class="map-card hist-map-card">
+          <div class="map-topbar">
+            <div class="map-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Ubicación de las lecturas
+            </div>
+            <span id="hist-map-hint" style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace">clic en una fila para ubicarla</span>
+          </div>
+          <div id="mapH"></div>
+          <div class="hist-map-empty" id="hist-map-empty" style="display:none">
+            Ninguna lectura del filtro actual tiene coordenadas registradas
+          </div>
+          <div class="map-legend">
+            <div class="leg-row"><div class="leg-dot" style="background:#d97706"></div>pendiente</div>
+            <div class="leg-row"><div class="leg-dot" style="background:#2563eb"></div>revisado</div>
+            <div class="leg-row"><div class="leg-dot" style="background:#4fffb0"></div>aprobado</div>
+            <div class="leg-row"><div class="leg-dot" style="background:#ff5f5f"></div>rechazado</div>
+          </div>
+        </div>
+
         <div class="table-wrap">
           <div class="t-head" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
             <div class="th" onclick="sortHistorial('tag')" style="cursor:pointer">Tag ↕</div>
@@ -824,6 +895,7 @@ nav { padding: 14px 10px; flex: 1; }
             <div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>Cargando historial…</div>
           </div>
         </div>
+        </div><!-- /.hist-split -->
       </div>
 
       <!-- VIEW: USUARIOS -->
@@ -842,12 +914,12 @@ nav { padding: 14px 10px; flex: 1; }
         <!-- Invite modal (inline, no fixed position) -->
         <div id="invite-box" style="display:none;background:var(--surface);border:1px solid var(--border-hover);border-radius:14px;padding:20px;margin-bottom:16px;animation:fadeUp .2s ease">
           <div style="font-size:15px;font-weight:500;margin-bottom:4px">Invitar nuevo usuario</div>
-          <div style="font-size:12px;color:var(--text-secondary);font-family:'DM Mono',monospace;margin-bottom:16px">Se enviará un magic link al correo ingresado</div>
-          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">Correo electrónico</label>
+          <div style="font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;margin-bottom:16px">Se enviará un magic link al correo ingresado</div>
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">Correo electrónico</label>
           <input id="invite-email" type="email" placeholder="usuario@correo.com" autocomplete="off"
             style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:10px"
             onkeydown="if(event.key==='Enter') sendInvite()">
-          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">Rol</label>
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">Rol</label>
           <select id="invite-rol" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:14px">
             <option value="user">user — puede leer tags</option>
             <option value="admin">admin — puede leer, escribir y cambiar estados</option>
@@ -1177,7 +1249,8 @@ function renderTable() {
       </div>
       <div style="display:flex;gap:4px">
         <button class="icon-btn" title="Ver mantenimientos" style="color:var(--blue)"
-          onclick="event.stopPropagation();openMaintPanel('${r.tag_id}','${r.tag}')">
+          data-tag-id="${esc(r.tag_id)}" data-tag-nombre="${esc(r.tag)}"
+          onclick="event.stopPropagation();openMaintPanel(this.dataset.tagId, this.dataset.tagNombre)">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
           </svg>
@@ -1192,11 +1265,9 @@ function renderTable() {
         </button>
       </div>
       <div style="display:flex;gap:4px">
-        <button class="icon-btn" title="Eliminar lectura" style="color:var(--red-d)"
+        <button class="icon-btn danger" title="Eliminar lectura"
           onclick="event.stopPropagation();deleteLectura('${r.id}')"
-          ${currentRole !== 'admin' ? 'disabled' : ''}
-          onmouseenter="this.style.color='var(--red)';this.style.background='var(--red-d)'"
-          onmouseleave="this.style.color='var(--red-d)';this.style.background='transparent'">
+          ${currentRole !== 'admin' ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
             <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -1236,7 +1307,7 @@ function openModal(id, st) {
     `${r?.tag} · ${r?.lugar} · lectura ${id.substring(0,8)}…`;
   document.getElementById('modal').classList.add('open');
   highlightOpt(st);
-  document.getElementById('modal').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  // El modal es sticky en .overlay-slot: ya queda a la vista solo.
 }
 
 function closeModal() {
@@ -1274,7 +1345,10 @@ async function guardarEstado() {
   const rh = allHistorial.find(x => x.id === editId);
   if (rh) rh.estado = selSt;
   closeModal();
-  renderTable(); drawMap(); updateKPIs();
+  renderTable(); updateKPIs();
+  // drawMap() solo con la vista Tags visible: en otra vista su contenedor
+  // esta en display:none y Leaflet se inicializaria midiendo 0x0.
+  if (currentView === 'tags') drawMap();
   if (currentView === 'historial') filterHistorial();
   showToast(`"${r?.tag || rh?.tag}" → estado actualizado a ${selSt}`);
 }
@@ -1415,8 +1489,16 @@ function formatHace(iso) {
   if (diff < 86400)return 'hace ' + Math.floor(diff/3600) + 'h';
   return 'hace ' + Math.floor(diff/86400) + 'd';
 }
+/* Escapa para insertar en HTML. Incluye comillas: sin ellas no sirve
+   para valores que van dentro de un atributo.
+   OJO: sirve para atributos de datos (data-*, title, value), NO para
+   atributos de evento como onclick — ahi el navegador decodifica las
+   entidades ANTES de pasar el texto al parser de JS, asi que &#39;
+   vuelve a ser una comilla y rompe el string igual. Para datos de
+   usuario que necesita un handler, usar data-* y leerlos con dataset. */
 function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function hideLoading() { document.getElementById('loading-screen').style.display = 'none'; }
 function showLogin()   { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app').classList.remove('ready'); }
@@ -1428,9 +1510,10 @@ function showApp()     { document.getElementById('login-screen').style.display =
 
 
 /* ── HISTORIAL COMPLETO ──────────────────────────── */
-let allHistorial  = [];
-let histSort      = { col: 'hora', dir: 'desc' };
-let histEstados   = new Set();
+let allHistorial   = [];
+let histSort       = { col: 'hora', dir: 'desc' };
+let histEstados    = new Set();
+let histSelectedId = null;
 
 async function loadHistorial() {
   const body = document.getElementById('hist-body');
@@ -1499,8 +1582,15 @@ function filterHistorial() {
 
 function renderHistorial(rows) {
   const body = document.getElementById('hist-body');
+
+  // Orden visible actual: lo usa la navegacion con ↑/↓
+  histVisibleIds = rows.map(r => r.id);
+  // Si el filtro dejo fuera la lectura seleccionada, soltarla
+  if (histSelectedId && !histVisibleIds.includes(histSelectedId)) histSelectedId = null;
+
   if (!rows.length) {
     body.innerHTML = '<div class="empty-state" style="padding:28px">Sin lecturas para este filtro</div>';
+    drawHistMap([]);
     return;
   }
 
@@ -1510,7 +1600,9 @@ function renderHistorial(rows) {
   };
 
   body.innerHTML = rows.map(r => `
-    <div class="t-row" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
+    <div class="t-row${histSelectedId === r.id ? ' selected' : ''}" id="hrow-${r.id}"
+      onclick="selectHistRow('${r.id}')"
+      style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
       <div>
         <div class="tag-n">${esc(r.tag)}</div>
         <div class="tag-uid-badge" style="margin-top:2px">${esc(r.uid)}</div>
@@ -1525,28 +1617,176 @@ function renderHistorial(rows) {
       <div style="font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;line-height:1.5">
         ${r.horaFmt}
       </div>
-      <div><span class="pill ${stColors[r.estado]||''}">${r.estado}</span></div>
-      <div>
+      <div><span class="pill ${stColors[r.estado]||''}${currentRole === 'admin' ? ' pill-edit' : ''}"
+        ${currentRole === 'admin'
+          ? `onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')" title="Clic para cambiar el estado"`
+          : 'title="Solo un admin puede cambiar el estado"'}>${r.estado}</span></div>
+      <div class="row-actions">
         <button class="icon-btn" title="Cambiar estado"
-          onclick="openHistModal('${r.id}','${r.estado}')"
+          onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')"
           ${currentRole !== 'admin' ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
           </svg>
         </button>
+        <button class="icon-btn danger" title="Eliminar lectura"
+          onclick="event.stopPropagation();deleteLectura('${r.id}')"
+          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+          </svg>
+        </button>
       </div>
     </div>`).join('');
+
+  drawHistMap(rows);
 }
 
+/* ── MAPA DEL HISTORIAL ────────────────────────────
+   Instancia propia de Leaflet. No se puede reutilizar la de la vista
+   Tags: #mapC vive dentro de #view-tags, que switchView() oculta con
+   display:none al pasar al historial.                                */
+let leafletMapH     = null;
+let leafletMarkersH = {};
+
+function initHistMap() {
+  if (leafletMapH) return;
+  leafletMapH = L.map('mapH', { center: [-33.45, -70.67], zoom: 14, zoomControl: true });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19, minZoom: 1
+  }).addTo(leafletMapH);
+}
+
+function drawHistMap(rows) {
+  initHistMap();
+
+  Object.values(leafletMarkersH).forEach(m => leafletMapH.removeLayer(m));
+  leafletMarkersH = {};
+
+  // lecturas.lat/lng puede venir null: la PWA guarda la lectura igual
+  // aunque el GPS no haya respondido.
+  const conCoords = rows.filter(r => r.lat != null && r.lng != null);
+  const sinCoords = rows.length - conCoords.length;
+
+  // Con una lectura seleccionada el mapa muestra SOLO ese tag; sin
+  // seleccion, todas las del filtro.
+  const sel      = histSelectedId ? allHistorial.find(x => x.id === histSelectedId) : null;
+  const selSinGps = sel && (sel.lat == null || sel.lng == null);
+  const aDibujar = sel ? conCoords.filter(r => r.id === histSelectedId) : conCoords;
+
+  const hayMapa = aDibujar.length > 0;
+  document.getElementById('hist-map-empty').style.display = hayMapa ? 'none' : 'block';
+  document.getElementById('mapH').style.display           = hayMapa ? 'block' : 'none';
+  document.getElementById('hist-map-empty').textContent   = selSinGps
+    ? 'Esta lectura no tiene coordenadas registradas'
+    : 'Ninguna lectura del filtro actual tiene coordenadas registradas';
+
+  const hint = document.getElementById('hist-map-hint');
+  if (selSinGps) {
+    hint.textContent = '⚠ sin ubicación (el GPS no respondió al escanear) · Esc para ver todas';
+    hint.style.color = 'var(--amber)';
+  } else if (sel) {
+    hint.textContent = 'mostrando solo ' + sel.tag + ' · Esc para ver todas';
+    hint.style.color = 'var(--accent)';
+  } else {
+    hint.textContent = sinCoords
+      ? sinCoords + ' de ' + rows.length + ' sin ubicación · ↑↓ para recorrer'
+      : 'clic o ↑↓ para recorrer las lecturas';
+    hint.style.color = 'var(--text-3)';
+  }
+
+  if (!hayMapa) return;
+
+  const bounds = [];
+  aDibujar.forEach(r => {
+    const marker = L.marker([r.lat, r.lng], {
+      icon: markerIcon(r.estado, r.id === histSelectedId)
+    }).addTo(leafletMapH);
+
+    marker.bindPopup(`
+      <div style="min-width:150px">
+        <div style="font-weight:500;margin-bottom:4px">${esc(r.tag)}</div>
+        <div style="font-size:11px;opacity:.7;margin-bottom:6px">${esc(r.lugar)}</div>
+        <div style="font-size:11px;opacity:.7">${esc(r.horaFmt)}</div>
+        <div style="margin-top:6px;font-size:11px;font-family:monospace;
+          padding:2px 8px;border-radius:20px;display:inline-block;
+          background:rgba(255,255,255,.08)">${esc(r.estado)}</div>
+      </div>`);
+
+    marker.on('click', () => selectHistRow(r.id));
+    leafletMarkersH[r.id] = marker;
+    bounds.push([r.lat, r.lng]);
+  });
+
+  if (histSelectedId && leafletMarkersH[histSelectedId]) {
+    const r = allHistorial.find(x => x.id === histSelectedId);
+    leafletMapH.flyTo([r.lat, r.lng], 16, { duration: 0.6 });
+    leafletMarkersH[histSelectedId].openPopup();
+  } else {
+    leafletMapH.fitBounds(bounds, { padding: [30, 30] });
+  }
+
+  // El contenedor estuvo en display:none mientras la vista estaba oculta,
+  // asi que Leaflet midio 0x0 y hay que forzarlo a recalcular.
+  leafletMapH.invalidateSize();
+}
+
+/* Segundo clic sobre la misma fila deselecciona y devuelve el mapa
+   a la vista general del filtro. */
+function selectHistRow(id) {
+  histSelectedId = (histSelectedId === id) ? null : id;
+  filterHistorial();
+}
+
+/* Recorrer el historial con ↑/↓: el mapa queda fijo y va siguiendo la
+   lectura seleccionada. Guarda las filas visibles en el orden en que
+   quedaron tras filtrar y ordenar. */
+let histVisibleIds = [];
+
+function moveHistSelection(paso) {
+  if (!histVisibleIds.length) return;
+  const i = histVisibleIds.indexOf(histSelectedId);
+  // Sin seleccion previa, ↓ arranca en la primera y ↑ en la ultima
+  const siguiente = i === -1
+    ? (paso > 0 ? 0 : histVisibleIds.length - 1)
+    : Math.min(Math.max(i + paso, 0), histVisibleIds.length - 1);
+
+  histSelectedId = histVisibleIds[siguiente];
+  filterHistorial();
+  document.getElementById('hrow-' + histSelectedId)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener('keydown', e => {
+  if (currentView !== 'historial') return;
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Escape') return;
+  // No secuestrar las flechas mientras se escribe en un filtro
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+  e.preventDefault();
+  if (e.key === 'Escape') {
+    // Con el modal abierto, Esc lo cierra; recien despues deselecciona
+    if (document.getElementById('modal').classList.contains('open')) { closeModal(); return; }
+    histSelectedId = null; filterHistorial(); return;
+  }
+  moveHistSelection(e.key === 'ArrowDown' ? 1 : -1);
+});
+
 function openHistModal(id, estado) {
-  // Reuse existing modal
+  if (currentRole !== 'admin') return;
+  // Reutiliza el modal compartido de .overlay-slot
   editId = id; selSt = estado;
   const r = allHistorial.find(x => x.id === id);
-  document.getElementById('modal-sub').textContent = (r?.tag || '—') + ' · ' + (r?.lugar || '—');
+  document.getElementById('modal-sub').textContent =
+    (r?.tag || '—') + ' · ' + (r?.lugar || '—') + ' · ' + (r?.horaFmt || '');
   document.getElementById('modal').classList.add('open');
   highlightOpt(estado);
-  document.getElementById('modal').scrollIntoView({ behavior:'smooth', block:'nearest' });
+  // Sin scrollIntoView: el modal es sticky y ya esta a la vista. Forzarlo
+  // saltaria al tope del historial y perderias la fila que estabas mirando.
 }
 
 function toggleHistChip(el, estado) {
@@ -1576,6 +1816,7 @@ function clearHistFilters() {
   histEstados.clear();
   document.querySelectorAll('.hist-chip').forEach(c => c.classList.remove('on'));
   histSort = { col: 'hora', dir: 'desc' };
+  histSelectedId = null;
   filterHistorial();
 }
 
@@ -1603,19 +1844,35 @@ function switchView(name) {
 }
 
 /* ── DELETE LECTURA ────────────────────────────────── */
+/* Sirve a las dos vistas: la lectura puede estar en allLecturas
+   (Tags recientes), en allHistorial, o en ambas. */
 async function deleteLectura(id) {
-  if (!confirm('¿Eliminar esta lectura? Esta acción eliminará también su historial de auditoría y no se puede deshacer.')) return;
+  if (currentRole !== 'admin') return;
 
-  // Primero eliminar registros de audit_log relacionados
-  const { error: auditError } = await sb.from('audit_log').delete().eq('lectura_id', id);
-  if (auditError) { showToast('Error en auditoría: ' + auditError.message, true); return; }
+  const r = allLecturas.find(x => x.id === id) || allHistorial.find(x => x.id === id);
+  const quien = r ? `"${r.tag}" · ${r.lugar}` : 'esta lectura';
+  if (!confirm(
+    `¿Eliminar la lectura de ${quien}?\n\n` +
+    `No se puede deshacer. El registro de auditoría se conserva, pero deja ` +
+    `de estar asociado a esta lectura.`
+  )) return;
 
-  // Luego eliminar la lectura
+  // Nada de borrar audit_log antes: esa tabla no tiene politica de DELETE
+  // (el borrado no hacia nada y devolvia 0 filas sin error), y el FK va
+  // con ON DELETE SET NULL, asi que la lectura se borra igual y la
+  // auditoria sobrevive. Ver schema.sql.
   const { error } = await sb.from('lecturas').delete().eq('id', id);
   if (error) { showToast('Error: ' + error.message, true); return; }
 
-  allLecturas = allLecturas.filter(r => r.id !== id);
-  renderTable(); drawMap(); updateKPIs();
+  allLecturas  = allLecturas.filter(x => x.id !== id);
+  allHistorial = allHistorial.filter(x => x.id !== id);
+  if (selectedId     === id) selectedId     = null;
+  if (histSelectedId === id) histSelectedId = null;
+  if (editId         === id) closeModal();
+
+  renderTable(); updateKPIs();
+  if (currentView === 'tags')      drawMap();
+  if (currentView === 'historial') filterHistorial();
   showToast('Lectura eliminada correctamente');
 }
 
@@ -1719,7 +1976,7 @@ async function sendInvite() {
   if (!email) { msg.style.color='var(--red)'; msg.textContent='Ingresa un correo válido'; return; }
 
   btn.disabled = true; btn.textContent = 'Enviando…';
-  msg.style.color = 'var(--text-secondary)'; msg.textContent = '';
+  msg.style.color = 'var(--text-2)'; msg.textContent = '';
 
   // Send magic link via Supabase
   const { error } = await sb.auth.signInWithOtp({
@@ -1737,30 +1994,28 @@ async function sendInvite() {
     return;
   }
 
-  // Wait briefly then set the role in profiles
-  // The profile is created by the trigger when the user first signs in
-  // We store the pending role to apply after sign-in
-  try {
-    // Try to update existing profile (if they already have one)
-    const { data: existing } = await sb.from('profiles').select('id').eq('email', email).maybeSingle();
-    if (existing) {
-      await sb.from('profiles').update({ rol }).eq('email', email);
-    } else {
-      // Store pending role in a way the trigger will pick up — 
-      // For now show a note to the admin
-    }
-  } catch(e) { console.warn('profile role:', e); }
+  // El rol NO se asigna desde aqui: 'authenticated' no tiene permiso de
+  // UPDATE sobre profiles.rol (ver el revoke en schema.sql), justamente
+  // para que nadie pueda auto-promoverse. El perfil lo crea el trigger
+  // handle_new_user con rol 'user' cuando el invitado entra por primera
+  // vez; el ascenso se hace por SQL.
 
   msg.style.color = 'var(--accent)';
-  msg.textContent = '✓ Magic link enviado a ' + email + (rol === 'admin' ? ' (admin)' : ' (usuario)');
+  msg.textContent = '✓ Magic link enviado a ' + email;
   btn.disabled = false; btn.textContent = 'Enviar invitación';
   document.getElementById('invite-email').value = '';
 
-  // Note about role
-  if (rol === 'admin') {
-    setTimeout(() => {
-      msg.textContent += ' — recuerda correr UPDATE profiles SET rol=\'admin\' WHERE email=\'' + email + '\' en Supabase después de que ingrese por primera vez';
-    }, 1000);
+  // El invitado entra siempre como 'user'. Si se pidio otro rol, dejamos
+  // el SQL listo para copiar.
+  if (rol !== 'user') {
+    const sql = `update public.profiles set rol = '${rol}' where email = '${email}';`;
+    msg.innerHTML = '✓ Magic link enviado a ' + esc(email) +
+      '<div style="margin-top:8px;color:var(--text-2);font-size:11px;line-height:1.5">' +
+      'Entrará como <b>user</b>. Para dejarlo como <b>' + esc(rol) + '</b>, corre esto en Supabase ' +
+      'después de su primer ingreso:' +
+      '<div style="margin-top:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);' +
+      'border-radius:6px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text);' +
+      'user-select:all;cursor:text;word-break:break-all">' + esc(sql) + '</div></div>';
   }
 
   // Reload users list
