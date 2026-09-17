@@ -786,8 +786,19 @@ const FOTOS_MAX   = 5;
 const BUCKET      = 'fotos-tags';
 const LADO_MAX    = 1600;   // px del lado largo tras redimensionar
 const CALIDAD     = 0.7;    // calidad JPEG
+const LADO_THUMB  = 320;    // miniatura
+const CALIDAD_TH  = 0.6;
 
-let fotosActuales = [];     // [{id, path, url}]
+/* Se sube una miniatura junto al original. Sin esto, la galeria del
+   dashboard descarga la foto completa (~275 KB) para dibujar un
+   cuadradito de 92px: abrir un punto con 20 fotos son 5,5 MB de egreso.
+   Con miniatura son ~400 KB — trece veces menos.
+   La ruta se deriva del original en vez de guardarse en otra columna,
+   para no necesitar una migracion. Las fotos subidas antes de este
+   cambio no tienen miniatura; quien la muestre debe caer al original. */
+const thumbPath = p => p.replace(/\.jpg$/i, '_thumb.jpg');
+
+let fotosActuales = [];     // [{id, path, url, urlThumb}]
 let fotoPendiente = null;   // Blob a la espera de guardar/descartar
 
 function fotoMsg(txt, color) {
@@ -808,20 +819,20 @@ function abrirCamara() {
 
 /* Una foto de celular pesa entre 3 y 12 MB. Sin esto, 5 fotos son
    hasta 60 MB subidos con datos moviles desde terreno. */
-function comprimir(file) {
+function comprimir(file, lado = LADO_MAX, calidad = CALIDAD) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
       let {width: w, height: h} = img;
-      const escala = Math.min(1, LADO_MAX / Math.max(w, h));
+      const escala = Math.min(1, lado / Math.max(w, h));
       w = Math.round(w * escala); h = Math.round(h * escala);
       const cv = document.createElement('canvas');
       cv.width = w; cv.height = h;
       cv.getContext('2d').drawImage(img, 0, 0, w, h);
       cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la imagen')),
-                'image/jpeg', CALIDAD);
+                'image/jpeg', calidad);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Archivo de imagen no válido')); };
     img.src = url;
@@ -849,7 +860,7 @@ async function fotoElegida(input) {
 function descartarFoto() {
   fotoPendiente = null;
   qs('#foto-preview').classList.remove('show');
-  qs('#foto-preview-img').src = '';
+  qs('#foto-preview-img').removeAttribute('src');
   qs('#btn-add-foto').style.display = 'block';
   fotoMsg('');
 }
@@ -871,6 +882,17 @@ async function guardarFoto() {
     return;
   }
 
+  // Miniatura. Si falla, no abortamos: la galeria cae al original.
+  const subidos = [path];
+  try {
+    const th = await comprimir(fotoPendiente, LADO_THUMB, CALIDAD_TH);
+    const upTh = await sb.storage.from(BUCKET).upload(thumbPath(path), th, {
+      contentType: 'image/jpeg', upsert: false
+    });
+    if (!upTh.error) subidos.push(thumbPath(path));
+    else console.warn('miniatura no subida:', upTh.error.message);
+  } catch (e) { console.warn('miniatura no generada:', e.message); }
+
   const {error} = await sb.from('fotos').insert({
     lectura_id: currentLecturaId,
     tag_id:     currentTagId,
@@ -881,8 +903,8 @@ async function guardarFoto() {
   btn.disabled = false; btn.textContent = 'Guardar';
 
   if (error) {
-    // El archivo ya subio pero la fila fallo: limpiarlo para no dejar huerfanos
-    await sb.storage.from(BUCKET).remove([path]);
+    // Los archivos ya subieron pero la fila fallo: limpiarlos para no dejar huerfanos
+    await sb.storage.from(BUCKET).remove(subidos);
     fotoMsg('Error al registrar: ' + error.message, 'var(--rd)');
     return;
   }
@@ -903,22 +925,32 @@ async function cargarFotos() {
     .order('created_at', {ascending: true});
   if (error) { fotoMsg('No se pudieron cargar las fotos: ' + error.message, 'var(--rd)'); return; }
 
-  // Bucket privado: hacen falta URLs firmadas para mostrarlas
-  const paths = (data || []).map(f => f.path);
+  // Bucket privado: hacen falta URLs firmadas. Se firman original y
+  // miniatura en una sola llamada.
+  const originales = (data || []).map(f => f.path);
   let urls = {};
-  if (paths.length) {
-    const {data: firmadas} = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+  if (originales.length) {
+    const todas = originales.concat(originales.map(thumbPath));
+    const {data: firmadas} = await sb.storage.from(BUCKET).createSignedUrls(todas, 3600);
     (firmadas || []).forEach(f => { if (!f.error) urls[f.path] = f.signedUrl; });
   }
-  fotosActuales = (data || []).map(f => ({...f, url: urls[f.path] || ''}));
+  fotosActuales = (data || []).map(f => ({
+    ...f,
+    url:      urls[f.path] || '',
+    urlThumb: urls[thumbPath(f.path)] || ''
+  }));
   pintarFotos();
 }
 
 function pintarFotos() {
   qs('#foto-count').textContent = fotosActuales.length + '/' + FOTOS_MAX;
+  // onerror: las fotos subidas antes de que existieran las miniaturas
+  // no tienen una, asi que se cae al original.
   qs('#foto-grid').innerHTML = fotosActuales.map((f, i) => `
     <div class="foto-tile">
-      <img src="${f.url}" alt="Foto ${i+1}" onclick="verFoto('${f.url}')">
+      <img src="${f.urlThumb || f.url}" alt="Foto ${i+1}"
+           data-full="${f.url}" onclick="verFoto(this.dataset.full)"
+           onerror="if(this.src!==this.dataset.full)this.src=this.dataset.full">
       <button class="foto-del" title="Borrar" onclick="borrarFoto('${f.id}')">✕</button>
     </div>`).join('');
   const lleno = fotosActuales.length >= FOTOS_MAX;
@@ -932,7 +964,7 @@ async function borrarFoto(id) {
   if (!f || !confirm('¿Borrar esta foto?')) return;
   const {error} = await sb.from('fotos').delete().eq('id', id);
   if (error) { fotoMsg('Error al borrar: ' + error.message, 'var(--rd)'); return; }
-  await sb.storage.from(BUCKET).remove([f.path]);
+  await sb.storage.from(BUCKET).remove([f.path, thumbPath(f.path)]);
   await cargarFotos();
   fotoMsg('Foto borrada', 'var(--tx3)');
 }
@@ -944,7 +976,7 @@ function verFoto(url) {
 }
 function cerrarVisor() {
   qs('#foto-visor').classList.remove('show');
-  qs('#foto-visor-img').src = '';
+  qs('#foto-visor-img').removeAttribute('src');
 }
 
 function goHome() {

@@ -2287,7 +2287,14 @@ async function openMaintPanel(tagId, tagName) {
    ver la evolucion del punto en el tiempo. El bucket es privado, asi
    que hay que firmar las URLs antes de mostrarlas.                  */
 const FOTO_BUCKET = 'fotos-tags';
+const FOTO_PAGINA = 24;   // fotos por tanda
 let currentFotoTagId = null;
+let fotoLimite      = FOTO_PAGINA;
+
+/* La miniatura se deriva del original; no hay columna aparte. Las fotos
+   subidas antes de que existieran no tienen una, y el <img> cae al
+   original con onerror. */
+const fotoThumbPath = p => p.replace(/\.jpg$/i, '_thumb.jpg');
 
 async function openFotoPanel(tagId, tagName) {
   if (!tagId || tagId === 'null' || tagId === '') {
@@ -2295,6 +2302,7 @@ async function openFotoPanel(tagId, tagName) {
     return;
   }
   currentFotoTagId = tagId;
+  fotoLimite = FOTO_PAGINA;   // cada apertura arranca en la primera tanda
   const panel = document.getElementById('foto-panel');
   panel.classList.add('open');
   document.getElementById('foto-panel-title').textContent = '📷 ' + tagName;
@@ -2326,7 +2334,7 @@ async function deleteFoto(btn) {
     return;
   }
 
-  const { error: se } = await sb.storage.from(FOTO_BUCKET).remove([path]);
+  const { error: se } = await sb.storage.from(FOTO_BUCKET).remove([path, fotoThumbPath(path)]);
   if (se) {
     // La fila ya no esta, asi que la foto desaparece del panel igual.
     // Solo queda el archivo ocupando espacio: avisar, no fallar.
@@ -2343,11 +2351,16 @@ async function loadFotoPanel(tagId) {
   const body = document.getElementById('foto-panel-body');
   const sub  = document.getElementById('foto-panel-sub');
 
-  const { data, error } = await sb
+  // Paginado: un punto visitado cada semana durante dos años acumula
+  // cientos de fotos, y traerlas todas en cada apertura es caro en
+  // egreso y lento. `count` da el total sin descargar el resto.
+  const { data, error, count } = await sb
     .from('fotos')
-    .select('id, path, created_at, lectura_id, profiles(nombre, email), lecturas(leido_en)')
+    .select('id, path, created_at, lectura_id, profiles(nombre, email), lecturas(leido_en)',
+            { count: 'exact' })
     .eq('tag_id', tagId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(0, fotoLimite - 1);
 
   if (error) {
     body.innerHTML = '<div class="empty-state" style="padding:16px">Error: ' + esc(error.message) + '</div>';
@@ -2358,9 +2371,10 @@ async function loadFotoPanel(tagId) {
     sub.textContent = 'Sin fotos'; return;
   }
 
-  // Una sola llamada para firmar todas las rutas
+  // Una sola llamada firma originales y miniaturas
   const paths = data.map(f => f.path);
-  const { data: firmadas } = await sb.storage.from(FOTO_BUCKET).createSignedUrls(paths, 3600);
+  const { data: firmadas } = await sb.storage.from(FOTO_BUCKET)
+    .createSignedUrls(paths.concat(paths.map(fotoThumbPath)), 3600);
   const urls = {};
   (firmadas || []).forEach(f => { if (!f.error) urls[f.path] = f.signedUrl; });
 
@@ -2372,7 +2386,9 @@ async function loadFotoPanel(tagId) {
     visitas.get(clave).push(f);
   });
 
-  sub.textContent = data.length + ' foto' + (data.length !== 1 ? 's' : '') +
+  const total = count ?? data.length;
+  sub.textContent = (data.length < total ? data.length + ' de ' + total : total) +
+                    ' foto' + (total !== 1 ? 's' : '') +
                     ' en ' + visitas.size + ' visita' + (visitas.size !== 1 ? 's' : '');
 
   body.innerHTML = [...visitas.values()].map(fotos => {
@@ -2395,7 +2411,10 @@ async function loadFotoPanel(tagId) {
                  data-url="${esc(urls[f.path] || '')}"
                  data-info="${esc(cuando + ' · ' + autor)}"
                  onclick="openLightbox(this.dataset.url, this.dataset.info)">
-              <img src="${esc(urls[f.path] || '')}" alt="Foto del punto" loading="lazy">
+              <img src="${esc(urls[fotoThumbPath(f.path)] || urls[f.path] || '')}"
+                   data-full="${esc(urls[f.path] || '')}"
+                   onerror="if(this.src!==this.dataset.full)this.src=this.dataset.full"
+                   alt="Foto del punto" loading="lazy">
               ${currentRole === 'admin' ? `
               <button class="foto-thumb-del" title="Eliminar foto"
                 data-id="${esc(f.id)}" data-path="${esc(f.path)}"
@@ -2404,6 +2423,20 @@ async function loadFotoPanel(tagId) {
         </div>
       </div>`;
   }).join('');
+
+  if (data.length < total) {
+    const restantes = total - data.length;
+    body.insertAdjacentHTML('beforeend', `
+      <button class="btn btn-ghost" onclick="verMasFotos()"
+              style="width:100%;margin-top:12px;font-size:12px">
+        Ver ${Math.min(restantes, FOTO_PAGINA)} más · quedan ${restantes}
+      </button>`);
+  }
+}
+
+async function verMasFotos() {
+  fotoLimite += FOTO_PAGINA;
+  if (currentFotoTagId) await loadFotoPanel(currentFotoTagId);
 }
 
 function openLightbox(url, info) {
@@ -2414,7 +2447,9 @@ function openLightbox(url, info) {
 }
 function closeLightbox() {
   document.getElementById('foto-lightbox').classList.remove('open');
-  document.getElementById('foto-lightbox-img').src = '';
+  // removeAttribute y no src='': un src vacio dispara una peticion
+  // fallida y ensucia la consola cada vez que se cierra el visor.
+  document.getElementById('foto-lightbox-img').removeAttribute('src');
 }
 
 function closeMaintPanel() {
