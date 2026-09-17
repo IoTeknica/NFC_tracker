@@ -229,7 +229,35 @@ nav { padding: 14px 10px; flex: 1; }
 .sidebar-footer {
   padding: 12px 10px;
   border-top: 1px solid var(--border);
+  position: relative;
 }
+/* Menu de cuenta. Se abre hacia arriba porque el footer esta abajo del todo. */
+.user-menu {
+  display: none;
+  position: absolute; bottom: calc(100% - 6px); left: 10px; right: 10px;
+  z-index: 40;
+  background: var(--surface2); border: 1px solid var(--border-h);
+  border-radius: 10px; padding: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55);
+}
+.user-menu.open { display: block; }
+.user-menu-hd {
+  font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace;
+  padding: 2px 4px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+  word-break: break-all; line-height: 1.5;
+}
+.user-menu-mail { color: var(--text-2); }
+.user-menu-btn {
+  width: 100%; text-align: left; padding: 9px 10px; margin-top: 4px;
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: background .15s, border-color .15s;
+}
+.user-menu-btn:hover { background: var(--surface); border-color: var(--border); }
+.user-menu-btn svg { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
+.user-menu-btn.danger { color: var(--red); }
+.user-menu-btn.danger:hover { background: var(--red-d); border-color: rgba(255,95,95,.25); }
 .user-row {
   display: flex; align-items: center; gap: 9px;
   padding: 8px 10px; border-radius: 8px;
@@ -399,6 +427,8 @@ nav { padding: 14px 10px; flex: 1; }
   display: flex; flex-direction: column;
 }
 .overlay-slot .modal-wrap, .overlay-slot .toast { max-width: 520px; }
+/* La galeria puede ser larga: que scrollee dentro y no tape la pantalla */
+.overlay-slot #foto-panel { max-height: 60vh; overflow-y: auto; }
 .toast svg { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
 
 /* Modal estado */
@@ -748,13 +778,34 @@ nav { padding: 14px 10px; flex: 1; }
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-row">
+      <!-- Menú de cuenta -->
+      <div class="user-menu" id="user-menu">
+        <div class="user-menu-hd">
+          Sesión iniciada como<br>
+          <span class="user-menu-mail" id="user-menu-mail">—</span>
+        </div>
+        <button class="user-menu-btn" onclick="switchUser()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M22 11l-3-3m0 0l-3 3m3-3v9"/>
+          </svg>
+          Entrar con otro usuario
+        </button>
+        <button class="user-menu-btn danger" onclick="logout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          Cerrar sesión
+        </button>
+      </div>
+
+      <div class="user-row" onclick="toggleUserMenu(event)">
         <div class="avatar av-user" id="sidebar-avatar">—</div>
         <div style="flex:1;min-width:0">
           <div class="user-name-s" id="sidebar-name">Cargando…</div>
           <div class="user-role-s" id="sidebar-role" style="color:var(--text-3)">—</div>
         </div>
-        <button class="logout-btn" onclick="logout()" title="Cerrar sesión">
+        <button class="logout-btn" onclick="event.stopPropagation();logout()" title="Cerrar sesión">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
           </svg>
@@ -784,6 +835,18 @@ nav { padding: 14px 10px; flex: 1; }
     <div class="content">
       <!-- Ranura compartida: visible desde cualquier vista -->
       <div class="overlay-slot">
+          <!-- FOTOS PANEL -->
+          <div class="maint-panel" id="foto-panel">
+            <div class="maint-panel-hd">
+              <div>
+                <div class="maint-panel-title" id="foto-panel-title">📷 Fotos del punto</div>
+                <div class="maint-panel-sub" id="foto-panel-sub">—</div>
+              </div>
+              <button class="btn btn-ghost" onclick="closeFotoPanel()" style="font-size:12px">✕ Cerrar</button>
+            </div>
+            <div id="foto-panel-body"></div>
+          </div>
+
           <!-- Visor de fotos (compartido, visible desde cualquier vista) -->
           <div class="foto-lightbox" id="foto-lightbox">
             <div class="foto-lightbox-hd">
@@ -864,18 +927,6 @@ nav { padding: 14px 10px; flex: 1; }
               <button class="btn btn-ghost" onclick="closeMaintPanel()" style="font-size:12px">✕ Cerrar</button>
             </div>
             <div id="maint-panel-body"></div>
-          </div>
-
-          <!-- FOTOS PANEL -->
-          <div class="maint-panel" id="foto-panel">
-            <div class="maint-panel-hd">
-              <div>
-                <div class="maint-panel-title" id="foto-panel-title">📷 Fotos del punto</div>
-                <div class="maint-panel-sub" id="foto-panel-sub">—</div>
-              </div>
-              <button class="btn btn-ghost" onclick="closeFotoPanel()" style="font-size:12px">✕ Cerrar</button>
-            </div>
-            <div id="foto-panel-body"></div>
           </div>
 
           <!-- Toolbar -->
@@ -968,7 +1019,7 @@ nav { padding: 14px 10px; flex: 1; }
         </div>
 
         <div class="table-wrap">
-          <div class="t-head" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
+          <div class="t-head" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 92px">
             <div class="th" onclick="sortHistorial('tag')" style="cursor:pointer">Tag ↕</div>
             <div class="th" onclick="sortHistorial('lugar')" style="cursor:pointer">Lugar ↕</div>
             <div class="th" onclick="sortHistorial('user')" style="cursor:pointer">Usuario ↕</div>
@@ -1184,9 +1235,61 @@ async function loginMagic() {
   showInfo('✓ Revisa tu correo — te enviamos el enlace de acceso.');
 }
 
+function toggleUserMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('user-menu');
+  const abierto = m.classList.toggle('open');
+  if (abierto) {
+    document.getElementById('user-menu-mail').textContent = currentUser?.email || '—';
+    // Un clic fuera lo cierra
+    setTimeout(() => document.addEventListener('click', cerrarUserMenu, { once: true }), 0);
+  }
+}
+function cerrarUserMenu() {
+  document.getElementById('user-menu').classList.remove('open');
+}
+
+/* Cerrar sesion y volver al login para que entre otra persona. Supabase
+   valida las credenciales en el formulario, igual que en el primer acceso. */
+async function switchUser() {
+  cerrarUserMenu();
+  await logout();
+  showInfo('Ingresa las credenciales del otro usuario.');
+  document.getElementById('email')?.focus();
+}
+
 async function logout() {
-  if (realtimeSub) sb.removeChannel(realtimeSub);
+  cerrarUserMenu();
+  if (realtimeSub) { sb.removeChannel(realtimeSub); realtimeSub = null; }
   await sb.auth.signOut();
+
+  /* Limpiar TODO el estado del usuario anterior. Sin esto, al entrar
+     otra persona quedaba el menu de gestion visible (la clase is-admin
+     no se quitaba nunca) y los datos del anterior en pantalla hasta la
+     primera consulta. */
+  const app = document.getElementById('app');
+  app.classList.remove('is-admin');
+
+  currentUser = null; currentRole = 'user';
+  allLecturas = []; allHistorial = [];
+  selectedId = null; histSelectedId = null; histVisibleIds = [];
+  editId = null; selSt = null;
+  chips.pend = false; chips.admin = false;
+  histEstados.clear();
+  currentFotoTagId = null;
+
+  closeModal(); closeFotoPanel(); closeMaintPanel();
+  document.getElementById('tbody').innerHTML = '';
+  document.getElementById('hist-body').innerHTML = '';
+  ['kpi-total','kpi-pend','kpi-tags','kpi-users','nav-count','nav-pending']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+
+  switchView('tags');
+
+  // Mostrar el login sin depender de onAuthStateChange: si ese evento no
+  // llega (red caida, por ejemplo), quedarias mirando un dashboard vacio.
+  hideLoading();
+  showLogin();
 }
 
 function setBtnLoading(v) {
@@ -1723,7 +1826,7 @@ function renderHistorial(rows) {
   body.innerHTML = rows.map(r => `
     <div class="t-row${histSelectedId === r.id ? ' selected' : ''}" id="hrow-${r.id}"
       onclick="selectHistRow('${r.id}')"
-      style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 80px">
+      style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 90px 92px">
       <div>
         <div class="tag-n">${esc(r.tag)}</div>
         <div class="tag-uid-badge" style="margin-top:2px">${esc(r.uid)}</div>
@@ -1743,6 +1846,14 @@ function renderHistorial(rows) {
           ? `onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')" title="Clic para cambiar el estado"`
           : 'title="Solo un admin puede cambiar el estado"'}>${r.estado}</span></div>
       <div class="row-actions">
+        <button class="icon-btn" title="Ver fotos del punto" style="color:var(--purple)"
+          data-tag-id="${esc(r.tag_id)}" data-tag-nombre="${esc(r.tag)}"
+          onclick="event.stopPropagation();openFotoPanel(this.dataset.tagId, this.dataset.tagNombre)">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
         <button class="icon-btn" title="Cambiar estado"
           onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')"
           ${currentRole !== 'admin' ? 'disabled' : ''}>
