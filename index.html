@@ -461,14 +461,14 @@ nav { padding: 14px 10px; flex: 1; }
 }
 .t-head {
   display: grid;
-  grid-template-columns: minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.1fr) 100px 80px 36px 36px;
+  grid-template-columns: minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.1fr) 100px 80px 92px 32px;
   padding: 9px 16px; gap: 8px;
   background: var(--surface2); border-bottom: 1px solid var(--border);
 }
 .th { font-size: 11px; color: var(--text-2); font-family: 'DM Mono', monospace; letter-spacing: .05em; font-weight: 500; }
 .t-row {
   display: grid;
-  grid-template-columns: minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.1fr) 100px 80px 36px 36px;
+  grid-template-columns: minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1.1fr) 100px 80px 92px 32px;
   padding: 12px 16px; gap: 8px;
   border-bottom: 1px solid var(--border);
   align-items: center; cursor: pointer;
@@ -504,6 +504,40 @@ nav { padding: 14px 10px; flex: 1; }
 .icon-btn svg { width: 13px; height: 13px; stroke: currentColor; }
 .icon-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
 .icon-btn:disabled { opacity: .3; cursor: default; }
+/* ── Galería de fotos del punto ─────────────────────── */
+.foto-visita { border-bottom: 1px solid var(--border); padding: 12px 0; }
+.foto-visita:last-child { border-bottom: none; }
+.foto-visita-hd {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11px; color: var(--text-3);
+  font-family: 'DM Mono', monospace; margin-bottom: 8px;
+}
+.foto-visita-fecha { color: var(--text-2); }
+.foto-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.foto-thumb {
+  width: 92px; height: 92px; border-radius: 9px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface2);
+  cursor: pointer; transition: border-color .15s; flex-shrink: 0;
+}
+.foto-thumb:hover { border-color: var(--purple); }
+.foto-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Visor: sticky y no fixed, que no funciona en el iframe del preview */
+.foto-lightbox {
+  display: none; position: sticky; top: 74px; z-index: 30;
+  background: var(--surface); border: 1px solid var(--border-h);
+  border-radius: 14px; padding: 14px; margin-bottom: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+.foto-lightbox.open { display: block; }
+.foto-lightbox img {
+  width: 100%; max-height: 420px; object-fit: contain;
+  border-radius: 10px; background: var(--bg); display: block;
+}
+.foto-lightbox-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+  font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace;
+}
 .icon-btn.danger { color: var(--red-d); }
 .icon-btn.danger:hover:not(:disabled) { color: var(--red); background: var(--red-d); border-color: rgba(255,95,95,.25); }
 .row-actions { display: flex; gap: 4px; }
@@ -737,6 +771,15 @@ nav { padding: 14px 10px; flex: 1; }
     <div class="content">
       <!-- Ranura compartida: visible desde cualquier vista -->
       <div class="overlay-slot">
+          <!-- Visor de fotos (compartido, visible desde cualquier vista) -->
+          <div class="foto-lightbox" id="foto-lightbox">
+            <div class="foto-lightbox-hd">
+              <span id="foto-lightbox-info">—</span>
+              <button class="btn btn-ghost" onclick="closeLightbox()" style="font-size:12px">✕ Cerrar</button>
+            </div>
+            <img id="foto-lightbox-img" alt="Foto del punto">
+          </div>
+
           <div class="toast" id="toast">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
             <span id="toast-msg"></span>
@@ -808,6 +851,18 @@ nav { padding: 14px 10px; flex: 1; }
               <button class="btn btn-ghost" onclick="closeMaintPanel()" style="font-size:12px">✕ Cerrar</button>
             </div>
             <div id="maint-panel-body"></div>
+          </div>
+
+          <!-- FOTOS PANEL -->
+          <div class="maint-panel" id="foto-panel">
+            <div class="maint-panel-hd">
+              <div>
+                <div class="maint-panel-title" id="foto-panel-title">📷 Fotos del punto</div>
+                <div class="maint-panel-sub" id="foto-panel-sub">—</div>
+              </div>
+              <button class="btn btn-ghost" onclick="closeFotoPanel()" style="font-size:12px">✕ Cerrar</button>
+            </div>
+            <div id="foto-panel-body"></div>
           </div>
 
           <!-- Toolbar -->
@@ -1270,6 +1325,14 @@ function renderTable() {
           onclick="event.stopPropagation();openMaintPanel(this.dataset.tagId, this.dataset.tagNombre)">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" title="Ver fotos del punto" style="color:var(--purple)"
+          data-tag-id="${esc(r.tag_id)}" data-tag-nombre="${esc(r.tag)}"
+          onclick="event.stopPropagation();openFotoPanel(this.dataset.tagId, this.dataset.tagNombre)">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
           </svg>
         </button>
         <button class="icon-btn" title="Cambiar estado"
@@ -2056,6 +2119,104 @@ async function openMaintPanel(tagId, tagName) {
   document.getElementById('maint-panel-body').innerHTML = '';
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   await loadMaintPanel(tagId);
+}
+
+/* ── FOTOS DEL PUNTO ────────────────────────────────
+   Las fotos se toman por visita (lectura) y se agrupan por tag, para
+   ver la evolucion del punto en el tiempo. El bucket es privado, asi
+   que hay que firmar las URLs antes de mostrarlas.                  */
+const FOTO_BUCKET = 'fotos-tags';
+
+async function openFotoPanel(tagId, tagName) {
+  if (!tagId || tagId === 'null' || tagId === '') {
+    showToast('Tag no registrado en BD — sin fotos', true);
+    return;
+  }
+  const panel = document.getElementById('foto-panel');
+  panel.classList.add('open');
+  document.getElementById('foto-panel-title').textContent = '📷 ' + tagName;
+  document.getElementById('foto-panel-sub').textContent   = 'Cargando fotos…';
+  document.getElementById('foto-panel-body').innerHTML    = '';
+  await loadFotoPanel(tagId);
+}
+
+function closeFotoPanel() {
+  document.getElementById('foto-panel').classList.remove('open');
+  closeLightbox();
+}
+
+async function loadFotoPanel(tagId) {
+  const body = document.getElementById('foto-panel-body');
+  const sub  = document.getElementById('foto-panel-sub');
+
+  const { data, error } = await sb
+    .from('fotos')
+    .select('id, path, created_at, lectura_id, profiles(nombre, email), lecturas(leido_en)')
+    .eq('tag_id', tagId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    body.innerHTML = '<div class="empty-state" style="padding:16px">Error: ' + esc(error.message) + '</div>';
+    sub.textContent = '—'; return;
+  }
+  if (!data?.length) {
+    body.innerHTML = '<div class="empty-state" style="padding:16px">Sin fotos registradas para este punto</div>';
+    sub.textContent = 'Sin fotos'; return;
+  }
+
+  // Una sola llamada para firmar todas las rutas
+  const paths = data.map(f => f.path);
+  const { data: firmadas } = await sb.storage.from(FOTO_BUCKET).createSignedUrls(paths, 3600);
+  const urls = {};
+  (firmadas || []).forEach(f => { if (!f.error) urls[f.path] = f.signedUrl; });
+
+  // Agrupar por visita: las de una misma lectura van juntas
+  const visitas = new Map();
+  data.forEach(f => {
+    const clave = f.lectura_id || ('suelta-' + f.id);
+    if (!visitas.has(clave)) visitas.set(clave, []);
+    visitas.get(clave).push(f);
+  });
+
+  sub.textContent = data.length + ' foto' + (data.length !== 1 ? 's' : '') +
+                    ' en ' + visitas.size + ' visita' + (visitas.size !== 1 ? 's' : '');
+
+  body.innerHTML = [...visitas.values()].map(fotos => {
+    const f0    = fotos[0];
+    const autor = f0.profiles?.nombre || f0.profiles?.email?.split('@')[0] || '—';
+    const cuando = formatDate(f0.lecturas?.leido_en || f0.created_at);
+    const suelta = f0.lectura_id ? '' :
+      ' · <span style="color:var(--amber)">lectura eliminada</span>';
+    return `
+      <div class="foto-visita">
+        <div class="foto-visita-hd">
+          <span class="foto-visita-fecha">${esc(cuando)}</span>
+          <span>·</span><span>${esc(autor)}</span>
+          <span>·</span><span>${fotos.length} foto${fotos.length !== 1 ? 's' : ''}</span>
+          ${suelta}
+        </div>
+        <div class="foto-thumbs">
+          ${fotos.map(f => `
+            <div class="foto-thumb"
+                 data-url="${esc(urls[f.path] || '')}"
+                 data-info="${esc(cuando + ' · ' + autor)}"
+                 onclick="openLightbox(this.dataset.url, this.dataset.info)">
+              <img src="${esc(urls[f.path] || '')}" alt="Foto del punto" loading="lazy">
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openLightbox(url, info) {
+  if (!url) return;
+  document.getElementById('foto-lightbox-img').src = url;
+  document.getElementById('foto-lightbox-info').textContent = info || '';
+  document.getElementById('foto-lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('foto-lightbox').classList.remove('open');
+  document.getElementById('foto-lightbox-img').src = '';
 }
 
 function closeMaintPanel() {
