@@ -69,7 +69,7 @@ admin la pega en NFC Tools (Write → Add a record → URL) y la graba en el chi
 
 ## Modelo de datos
 
-Cinco tablas en Supabase, todas con RLS activo:
+Seis tablas en Supabase, todas con RLS activo, mas un bucket de Storage:
 
 - **profiles** — extiende `auth.users`. Campo `rol`: `admin` | `operador` | `user`.
   Un trigger `handle_new_user` crea la fila al registrarse.
@@ -81,6 +81,14 @@ Cinco tablas en Supabase, todas con RLS activo:
   `aprobado` | `rechazado`. Los crea el operador, los aprueba el admin.
 - **audit_log** — inmutable. Un trigger `log_estado_change` inserta aqui cada
   vez que cambia `lecturas.estado`.
+- **fotos** — fotografias del punto. Pertenecen a UNA visita (`lectura_id`) y
+  se agrupan por punto (`tag_id`, denormalizado para que el dashboard no
+  necesite el join con lecturas). En Postgres solo vive la ruta; el archivo
+  esta en el bucket. `lectura_id` va con `ON DELETE SET NULL`: borrar una
+  lectura no debe hacer desaparecer la evidencia del punto.
+
+El bucket `fotos-tags` es **privado**. El dashboard muestra las fotos con URLs
+firmadas (`createSignedUrls`), que caducan solas.
 
 El esquema completo con politicas RLS esta en `schema.sql`.
 
@@ -91,6 +99,7 @@ El esquema completo con politicas RLS esta en `schema.sql`.
 | Leer tags | si | si | si |
 | Ver historial propio | si | si | si |
 | Agregar mantenimiento | no | si | si |
+| Agregar fotos del punto | no | si | si |
 | Aprobar mantenimientos | no | no | si |
 | Registrar tags | no | no | si |
 | Cambiar estado de lecturas | no | no | si |
@@ -111,6 +120,35 @@ Dos filas de la tabla de arriba se aplican solo en la UI, no en la base:
 autenticado) y **acceso al dashboard** (no hay control de rol al entrar; el
 menu de gestion se oculta con CSS). Un `user` que abra la consola puede
 listar `profiles` y `mantenimientos` completos.
+
+**Fotos no**: ahi el rol se valida en la politica RLS, tanto en la tabla como
+en el bucket. Es el criterio a seguir de aqui en adelante.
+
+
+## Fotos del punto
+
+Operador y admin pueden adjuntar hasta **5 fotos por visita** al leer un tag.
+El tope se valida en la base con el trigger `check_max_fotos`, no solo en la
+UI. En el dashboard aparecen con el icono de camara al lado del de
+mantenimientos, agrupadas por visita.
+
+**La camara se abre con `<input type="file" capture="environment">`, NO con
+`getUserMedia`.** Es la misma decision que con la Web NFC y por el mismo
+motivo: `getUserMedia` pertenece a la familia de APIs que ya fallo en los
+Huawei con EMUI (sin Chrome) y en el Samsung con Android 10. `capture` delega
+en la app de camara del sistema y funciona en cualquier telefono. Ademas el
+flujo pedido (tomar → guardar o descartar → tomar otra o salir) sale igual.
+
+**Las fotos se comprimen antes de subir**, y no es opcional: una foto de
+celular pesa entre 3 y 12 MB, asi que 5 serian hasta 60 MB subidos con datos
+moviles desde terreno. Se redimensiona el lado largo a 1600px y se recodifica
+a JPEG con calidad 0.7 — medido: 2,73 MB → 273 KB, y las cinco quedan en
+~1,3 MB.
+
+Si la fila de `fotos` falla despues de que el archivo ya subio, la app borra
+el archivo para no dejar huerfanos en el bucket.
+
+Pendiente: sin señal la subida falla. La cola offline sigue sin implementarse.
 
 ## Trampas conocidas
 
