@@ -521,6 +521,19 @@ nav { padding: 14px 10px; flex: 1; }
 }
 .foto-thumb:hover { border-color: var(--purple); }
 .foto-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Borrar foto — solo admin */
+.foto-thumb { position: relative; }
+.foto-thumb-del {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 1px solid transparent; background: rgba(12,14,18,.8);
+  color: var(--red-d); cursor: pointer; font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s, color .15s, background .15s;
+}
+.foto-thumb:hover .foto-thumb-del { opacity: 1; }
+.foto-thumb-del:hover { color: var(--red); background: rgba(255,95,95,.2); border-color: rgba(255,95,95,.35); }
+.foto-thumb-del:disabled { opacity: .4; cursor: default; }
 /* Visor: sticky y no fixed, que no funciona en el iframe del preview */
 .foto-lightbox {
   display: none; position: sticky; top: 74px; z-index: 30;
@@ -828,7 +841,7 @@ nav { padding: 14px 10px; flex: 1; }
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               Mapa de lecturas
             </div>
-            <span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace">clic para seleccionar</span>
+            <span id="map-hint" style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace">clic para seleccionar</span>
           </div>
           <div id="mapC"></div>
           <div class="map-legend">
@@ -1365,12 +1378,19 @@ function toggleChip(k) {
   renderTable(); drawMap();
 }
 
+/* Segundo clic sobre la misma fila deselecciona y el mapa vuelve a
+   mostrar todas las del filtro. Sin esto quedarias atrapado viendo un
+   solo tag, porque el mapa ahora aisla al seleccionado. */
 function selectRow(id) {
-  selectedId = id;
+  const deselecciona = (selectedId === id);
+  selectedId = deselecciona ? null : id;
   renderTable(); drawMap();
+  if (deselecciona) { closeModal(); return; }
+
+  // El clic solo selecciona y ubica: el modal de estado vive en el lapiz.
+  // Si abriera aca, recorrer el mapa clickeando filas seria un desfile de
+  // dialogos, ahora que cada seleccion aisla un tag.
   const r = allLecturas.find(x => x.id === id);
-  if (r && currentRole === 'admin') openModal(r.id, r.estado);
-  // Volar al marcador en el mapa
   if (r && r.lat && r.lng && leafletMap) {
     leafletMap.flyTo([r.lat, r.lng], 16, { duration: 0.6 });
   }
@@ -1498,10 +1518,31 @@ function drawMap() {
   leafletMarkers = {};
 
   const fr = getFiltered().filter(r => r.lat && r.lng);
-  if (!fr.length) return;
+
+  // Con una lectura seleccionada el mapa muestra SOLO ese tag; sin
+  // seleccion, todas las del filtro. Mismo criterio que drawHistMap().
+  const sel       = selectedId ? allLecturas.find(x => x.id === selectedId) : null;
+  const selSinGps = sel && !(sel.lat && sel.lng);
+  const aDibujar  = (sel && !selSinGps) ? fr.filter(r => r.id === selectedId) : fr;
+
+  const hint = document.getElementById('map-hint');
+  if (hint) {
+    if (selSinGps) {
+      hint.textContent = '⚠ sin ubicación registrada';
+      hint.style.color = 'var(--amber)';
+    } else if (sel) {
+      hint.textContent = 'mostrando solo ' + sel.tag;
+      hint.style.color = 'var(--accent)';
+    } else {
+      hint.textContent = 'clic para seleccionar';
+      hint.style.color = 'var(--text-3)';
+    }
+  }
+
+  if (!aDibujar.length) { leafletMap.invalidateSize(); return; }
 
   const bounds = [];
-  fr.forEach(r => {
+  aDibujar.forEach(r => {
     const isSel = r.id === selectedId;
     const marker = L.marker([r.lat, r.lng], {
       icon: markerIcon(r.estado, isSel)
@@ -1841,11 +1882,20 @@ function moveHistSelection(paso) {
 }
 
 document.addEventListener('keydown', e => {
-  if (currentView !== 'historial') return;
+  if (currentView !== 'historial' && currentView !== 'tags') return;
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Escape') return;
   // No secuestrar las flechas mientras se escribe en un filtro
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+  // En Tags recientes solo actua Esc: ahi no hay navegacion con flechas
+  if (currentView === 'tags') {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (document.getElementById('modal').classList.contains('open')) { closeModal(); return; }
+    selectedId = null; renderTable(); drawMap();
+    return;
+  }
 
   e.preventDefault();
   if (e.key === 'Escape') {
@@ -2126,12 +2176,14 @@ async function openMaintPanel(tagId, tagName) {
    ver la evolucion del punto en el tiempo. El bucket es privado, asi
    que hay que firmar las URLs antes de mostrarlas.                  */
 const FOTO_BUCKET = 'fotos-tags';
+let currentFotoTagId = null;
 
 async function openFotoPanel(tagId, tagName) {
   if (!tagId || tagId === 'null' || tagId === '') {
     showToast('Tag no registrado en BD — sin fotos', true);
     return;
   }
+  currentFotoTagId = tagId;
   const panel = document.getElementById('foto-panel');
   panel.classList.add('open');
   document.getElementById('foto-panel-title').textContent = '📷 ' + tagName;
@@ -2142,7 +2194,38 @@ async function openFotoPanel(tagId, tagName) {
 
 function closeFotoPanel() {
   document.getElementById('foto-panel').classList.remove('open');
+  currentFotoTagId = null;
   closeLightbox();
+}
+
+/* Borra la fila y el archivo del bucket. El orden importa: primero la
+   fila, porque es la que RLS puede rechazar. Si se borrara el archivo
+   antes y la fila fallara, quedaria una foto fantasma en el panel
+   apuntando a un objeto inexistente. */
+async function deleteFoto(btn) {
+  if (currentRole !== 'admin') return;
+  const id = btn.dataset.id, path = btn.dataset.path;
+  if (!confirm('¿Eliminar esta foto?\n\nNo se puede deshacer.')) return;
+
+  btn.disabled = true;
+  const { error } = await sb.from('fotos').delete().eq('id', id);
+  if (error) {
+    btn.disabled = false;
+    showToast('Error al eliminar: ' + error.message, true);
+    return;
+  }
+
+  const { error: se } = await sb.storage.from(FOTO_BUCKET).remove([path]);
+  if (se) {
+    // La fila ya no esta, asi que la foto desaparece del panel igual.
+    // Solo queda el archivo ocupando espacio: avisar, no fallar.
+    showToast('Foto eliminada, pero el archivo quedó en el bucket: ' + se.message, true);
+  } else {
+    showToast('Foto eliminada');
+  }
+
+  closeLightbox();
+  if (currentFotoTagId) await loadFotoPanel(currentFotoTagId);
 }
 
 async function loadFotoPanel(tagId) {
@@ -2202,6 +2285,10 @@ async function loadFotoPanel(tagId) {
                  data-info="${esc(cuando + ' · ' + autor)}"
                  onclick="openLightbox(this.dataset.url, this.dataset.info)">
               <img src="${esc(urls[f.path] || '')}" alt="Foto del punto" loading="lazy">
+              ${currentRole === 'admin' ? `
+              <button class="foto-thumb-del" title="Eliminar foto"
+                data-id="${esc(f.id)}" data-path="${esc(f.path)}"
+                onclick="event.stopPropagation();deleteFoto(this)">✕</button>` : ''}
             </div>`).join('')}
         </div>
       </div>`;
