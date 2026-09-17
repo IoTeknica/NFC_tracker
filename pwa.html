@@ -127,6 +127,28 @@ body{overflow-x:hidden}
 .est-rechazado{background:var(--rdd);color:var(--rd)}
 .btn-add-maint{width:100%;padding:11px;background:var(--sf2);border:1px dashed rgba(255,255,255,0.15);border-radius:10px;color:var(--tx2);font-size:13px;cursor:pointer;transition:all .15s;margin-bottom:8px}
 .btn-add-maint:active{background:var(--br)}
+
+/* ── FOTOS DEL PUNTO ─────────────────────────────────── */
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.foto-tile{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--sf2);border:1px solid var(--br)}
+.foto-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-del{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:6px;border:none;background:rgba(12,14,18,.78);color:var(--rd);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.foto-subiendo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,14,18,.72);font-size:10px;color:var(--ac);font-family:"DM Mono",monospace}
+/* Vista previa de la foto recien tomada, antes de decidir */
+.foto-preview{background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:8px;display:none}
+.foto-preview.show{display:block}
+.foto-preview img{width:100%;border-radius:9px;display:block;margin-bottom:10px;max-height:300px;object-fit:contain;background:var(--sf2)}
+.foto-preview-btns{display:flex;gap:8px}
+.foto-preview-btns button{flex:1;padding:11px;border-radius:9px;font-size:13px;cursor:pointer;border:1px solid var(--br)}
+.btn-foto-descartar{background:var(--sf2);color:var(--tx2)}
+.btn-foto-guardar{background:var(--ac);color:#0c0e12;border-color:var(--ac);font-weight:600}
+.foto-peso{font-size:10px;color:var(--tx3);font-family:"DM Mono",monospace;text-align:center;margin-bottom:8px}
+.foto-msg{font-size:11px;font-family:"DM Mono",monospace;margin-bottom:8px;min-height:14px}
+/* Visor a pantalla completa */
+.foto-visor{position:absolute;inset:0;background:rgba(8,10,13,.97);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+.foto-visor.show{display:flex}
+.foto-visor img{max-width:100%;max-height:78%;border-radius:10px;object-fit:contain}
+.foto-visor button{margin-top:14px;padding:11px 22px;border-radius:9px;border:1px solid var(--br);background:var(--sf2);color:var(--tx);font-size:13px;cursor:pointer}
 .maint-form{background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:14px;margin-bottom:8px;display:none}
 .maint-form.show{display:block}
 .maint-textarea{width:100%;padding:10px 12px;background:var(--sf2);border:1px solid var(--br);border-radius:8px;color:var(--tx);font-size:13px;font-family:"DM Sans",sans-serif;resize:vertical;min-height:90px;margin-bottom:10px;-webkit-appearance:none}
@@ -237,6 +259,36 @@ body{overflow-x:hidden}
     <div class="rd-row"><span class="rd-k">Hora</span><span class="rd-v" id="rd-hora">—</span></div>
     <div class="rd-row"><span class="rd-k">Estado</span><span class="rd-v" id="rd-estado" style="color:var(--am)">pendiente</span></div>
   </div>
+  <!-- FOTOS DEL PUNTO -->
+  <div class="maint-section" id="foto-section" style="display:none">
+    <div class="maint-hd">
+      <span class="maint-title">📷 Fotos del punto</span>
+      <span class="maint-count" id="foto-count">0/5</span>
+    </div>
+
+    <div class="foto-grid" id="foto-grid"></div>
+    <div class="foto-msg" id="foto-msg"></div>
+
+    <!-- Vista previa de la foto recien tomada -->
+    <div class="foto-preview" id="foto-preview">
+      <img id="foto-preview-img" alt="Foto recién tomada">
+      <div class="foto-peso" id="foto-peso"></div>
+      <div class="foto-preview-btns">
+        <button class="btn-foto-descartar" onclick="descartarFoto()">Descartar</button>
+        <button class="btn-foto-guardar" id="btn-foto-guardar" onclick="guardarFoto()">Guardar</button>
+      </div>
+    </div>
+
+    <!-- capture delega en la camara del sistema: no usamos getUserMedia,
+         que es la familia de APIs que ya fallo con NFC en EMUI -->
+    <input type="file" id="foto-input" accept="image/*" capture="environment"
+           style="display:none" onchange="fotoElegida(this)">
+
+    <button class="btn-add-maint" id="btn-add-foto" onclick="abrirCamara()">
+      + Tomar foto del punto
+    </button>
+  </div>
+
   <!-- MAINTENANCE SECTION -->
   <div class="maint-section" id="maint-section" style="display:none">
     <div class="maint-hd">
@@ -260,6 +312,12 @@ body{overflow-x:hidden}
   </div>
 
   <button class="btn-home" onclick="goHome()">Ir al inicio</button>
+
+  <!-- Visor a pantalla completa -->
+  <div class="foto-visor" id="foto-visor" onclick="cerrarVisor()">
+    <img id="foto-visor-img" alt="Foto ampliada">
+    <button onclick="cerrarVisor()">Cerrar</button>
+  </div>
 </div>
 
 <!-- APP -->
@@ -368,6 +426,7 @@ let currentUser = null;
 let currentRole = 'user';
 let pendingUID  = null;   // UID from URL when not yet logged in
 let currentTagId = null; // tag_id of last scanned tag
+let currentLecturaId = null; // id de la lectura recien registrada (para las fotos)
 
 /* ======================================================
    INIT — detect tag from URL first
@@ -518,18 +577,21 @@ async function processTagRead(uid) {
   setReadState('loading', 'Guardando lectura…', 'Registrando en Supabase');
 
   // Save to Supabase
-  const {error} = await sb.from('lecturas').insert({
+  // .select() para recuperar el id: las fotos se asocian a esta lectura.
+  // La politica "User ve sus lecturas" permite leer la fila recien creada.
+  const {data: nueva, error} = await sb.from('lecturas').insert({
     tag_id:   tag?.id || null,
     user_id:  currentUser.id,
     lat, lng,
     estado:   'pendiente',
     leido_en: new Date().toISOString()
-  });
+  }).select('id').single();
 
   if (error) {
     setReadState('error', 'Error al guardar', error.message);
     return;
   }
+  currentLecturaId = nueva?.id || null;
 
   // Show success
   const gpsText = lat ? lat.toFixed(6) + ', ' + lng.toFixed(6) : 'No obtenido — activa permisos de ubicación';
@@ -562,8 +624,14 @@ async function processTagRead(uid) {
     // Show add button only for operador and admin
     const canAdd = ['admin','operador'].includes(currentRole);
     qs('#btn-add-maint').style.display = canAdd ? 'block' : 'none';
+
+    // Fotos: mismo criterio de rol que mantenimiento
+    descartarFoto();
+    qs('#foto-section').style.display = canAdd ? 'block' : 'none';
+    if (canAdd) await cargarFotos();
   } else {
     qs('#maint-section').style.display = 'none';
+    qs('#foto-section').style.display = 'none';
   }
 }
 
@@ -707,6 +775,176 @@ async function saveMaint() {
   qs('#maint-form').classList.remove('show');
   qs('#btn-add-maint').style.display = 'block';
   await loadMaintenance(currentTagId);
+}
+
+/* ======================================================
+   FOTOS DEL PUNTO
+   Hasta 5 por visita. El archivo va al bucket 'fotos-tags'
+   de Supabase Storage; en Postgres solo queda la ruta.
+   ====================================================== */
+const FOTOS_MAX   = 5;
+const BUCKET      = 'fotos-tags';
+const LADO_MAX    = 1600;   // px del lado largo tras redimensionar
+const CALIDAD     = 0.7;    // calidad JPEG
+
+let fotosActuales = [];     // [{id, path, url}]
+let fotoPendiente = null;   // Blob a la espera de guardar/descartar
+
+function fotoMsg(txt, color) {
+  const el = qs('#foto-msg');
+  el.textContent = txt || '';
+  el.style.color = color || 'var(--tx3)';
+}
+
+function abrirCamara() {
+  if (fotosActuales.length >= FOTOS_MAX) {
+    fotoMsg('Ya hay ' + FOTOS_MAX + ' fotos. Borra una para tomar otra.', 'var(--am)');
+    return;
+  }
+  fotoMsg('');
+  qs('#foto-input').value = '';   // permite volver a elegir el mismo archivo
+  qs('#foto-input').click();
+}
+
+/* Una foto de celular pesa entre 3 y 12 MB. Sin esto, 5 fotos son
+   hasta 60 MB subidos con datos moviles desde terreno. */
+function comprimir(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let {width: w, height: h} = img;
+      const escala = Math.min(1, LADO_MAX / Math.max(w, h));
+      w = Math.round(w * escala); h = Math.round(h * escala);
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la imagen')),
+                'image/jpeg', CALIDAD);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Archivo de imagen no válido')); };
+    img.src = url;
+  });
+}
+
+async function fotoElegida(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  fotoMsg('Procesando…', 'var(--tx3)');
+  try {
+    const blob = await comprimir(file);
+    fotoPendiente = blob;
+    qs('#foto-preview-img').src = URL.createObjectURL(blob);
+    qs('#foto-peso').textContent =
+      (file.size/1048576).toFixed(1) + ' MB → ' + Math.round(blob.size/1024) + ' KB';
+    qs('#foto-preview').classList.add('show');
+    qs('#btn-add-foto').style.display = 'none';
+    fotoMsg('');
+  } catch (e) {
+    fotoMsg('No se pudo procesar la foto: ' + e.message, 'var(--rd)');
+  }
+}
+
+function descartarFoto() {
+  fotoPendiente = null;
+  qs('#foto-preview').classList.remove('show');
+  qs('#foto-preview-img').src = '';
+  qs('#btn-add-foto').style.display = 'block';
+  fotoMsg('');
+}
+
+async function guardarFoto() {
+  if (!fotoPendiente || !currentTagId) return;
+  const btn = qs('#btn-foto-guardar');
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+
+  const nombre = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+  const path   = `${currentTagId}/${currentLecturaId || 'sin-lectura'}/${nombre}.jpg`;
+
+  const up = await sb.storage.from(BUCKET).upload(path, fotoPendiente, {
+    contentType: 'image/jpeg', upsert: false
+  });
+  if (up.error) {
+    btn.disabled = false; btn.textContent = 'Guardar';
+    fotoMsg('Error al subir: ' + up.error.message, 'var(--rd)');
+    return;
+  }
+
+  const {error} = await sb.from('fotos').insert({
+    lectura_id: currentLecturaId,
+    tag_id:     currentTagId,
+    user_id:    currentUser.id,
+    path
+  });
+
+  btn.disabled = false; btn.textContent = 'Guardar';
+
+  if (error) {
+    // El archivo ya subio pero la fila fallo: limpiarlo para no dejar huerfanos
+    await sb.storage.from(BUCKET).remove([path]);
+    fotoMsg('Error al registrar: ' + error.message, 'var(--rd)');
+    return;
+  }
+
+  descartarFoto();
+  await cargarFotos();
+  // pintarFotos() ya avisa cuando se llego al tope; no contradecirlo
+  if (fotosActuales.length < FOTOS_MAX) {
+    fotoMsg('✓ Foto guardada — puedes tomar otra o salir', 'var(--ac)');
+  }
+}
+
+async function cargarFotos() {
+  if (!currentLecturaId) { fotosActuales = []; pintarFotos(); return; }
+  const {data, error} = await sb.from('fotos')
+    .select('id, path')
+    .eq('lectura_id', currentLecturaId)
+    .order('created_at', {ascending: true});
+  if (error) { fotoMsg('No se pudieron cargar las fotos: ' + error.message, 'var(--rd)'); return; }
+
+  // Bucket privado: hacen falta URLs firmadas para mostrarlas
+  const paths = (data || []).map(f => f.path);
+  let urls = {};
+  if (paths.length) {
+    const {data: firmadas} = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+    (firmadas || []).forEach(f => { if (!f.error) urls[f.path] = f.signedUrl; });
+  }
+  fotosActuales = (data || []).map(f => ({...f, url: urls[f.path] || ''}));
+  pintarFotos();
+}
+
+function pintarFotos() {
+  qs('#foto-count').textContent = fotosActuales.length + '/' + FOTOS_MAX;
+  qs('#foto-grid').innerHTML = fotosActuales.map((f, i) => `
+    <div class="foto-tile">
+      <img src="${f.url}" alt="Foto ${i+1}" onclick="verFoto('${f.url}')">
+      <button class="foto-del" title="Borrar" onclick="borrarFoto('${f.id}')">✕</button>
+    </div>`).join('');
+  const lleno = fotosActuales.length >= FOTOS_MAX;
+  qs('#btn-add-foto').style.display =
+    (fotoPendiente || lleno) ? 'none' : 'block';
+  if (lleno) fotoMsg('Máximo de ' + FOTOS_MAX + ' fotos alcanzado', 'var(--tx3)');
+}
+
+async function borrarFoto(id) {
+  const f = fotosActuales.find(x => x.id === id);
+  if (!f || !confirm('¿Borrar esta foto?')) return;
+  const {error} = await sb.from('fotos').delete().eq('id', id);
+  if (error) { fotoMsg('Error al borrar: ' + error.message, 'var(--rd)'); return; }
+  await sb.storage.from(BUCKET).remove([f.path]);
+  await cargarFotos();
+  fotoMsg('Foto borrada', 'var(--tx3)');
+}
+
+function verFoto(url) {
+  if (!url) return;
+  qs('#foto-visor-img').src = url;
+  qs('#foto-visor').classList.add('show');
+}
+function cerrarVisor() {
+  qs('#foto-visor').classList.remove('show');
+  qs('#foto-visor-img').src = '';
 }
 
 function goHome() {
