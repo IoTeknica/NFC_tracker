@@ -148,6 +148,26 @@ a JPEG con calidad 0.7 — medido: 2,73 MB → 273 KB, y las cinco quedan en
 Si la fila de `fotos` falla despues de que el archivo ya subio, la app borra
 el archivo para no dejar huerfanos en el bucket.
 
+**Cada foto sube DOS archivos**: el original de 1600px (~275 KB) y una
+miniatura de 320px (~11 KB). La ruta de la miniatura se deriva del original
+(`<uuid>.jpg` → `<uuid>_thumb.jpg`), no hay columna aparte — asi no hizo
+falta una migracion. Al borrar hay que quitar las dos.
+
+El motivo es el egreso, no el espacio: la galeria dibuja cuadraditos de 92px,
+y sin miniatura el navegador se baja el original entero para mostrarlos. Un
+punto con 20 fotos pasaba de **5,37 MB a 0,21 MB** por apertura — 25 veces
+menos. La miniatura solo suma ~4% de almacenamiento.
+
+Las fotos subidas antes de este cambio no tienen miniatura. Los `<img>` de la
+galeria llevan `onerror` que cae al original, asi que se siguen viendo.
+
+Si la miniatura falla al generarse o subirse, la foto se guarda igual: es una
+optimizacion, no un requisito.
+
+**La galeria del dashboard esta paginada** de a 24 fotos (`FOTO_PAGINA`), con
+un boton "ver mas". Un punto visitado cada semana durante dos años acumula
+cientos de fotos y traerlas todas en cada apertura es lento y caro.
+
 Pendiente: sin señal la subida falla. La cola offline sigue sin implementarse.
 
 ## Trampas conocidas
