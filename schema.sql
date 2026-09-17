@@ -142,6 +142,51 @@ create table if not exists public.tag_writes (
 
 
 -- ============================================================
+-- 6b. FOTOS  (fotografias del punto, tomadas en terreno)
+-- ============================================================
+-- Una foto pertenece a UNA visita (lectura_id) y se agrupa por punto
+-- (tag_id). El tag_id esta denormalizado a proposito: el panel del
+-- dashboard consulta por tag y asi evita el join con lecturas.
+--
+-- lectura_id va con ON DELETE SET NULL, igual que audit_log: borrar una
+-- lectura no debe hacer desaparecer la evidencia fotografica del punto.
+--
+-- 'path' es la ruta dentro del bucket de Storage, con el formato
+--   <tag_id>/<lectura_id>/<uuid>.jpg
+-- El archivo en si NO vive en Postgres.
+
+create table if not exists public.fotos (
+  id          uuid primary key default gen_random_uuid(),
+  lectura_id  uuid references public.lecturas(id) on delete set null,
+  tag_id      uuid references public.tags(id) on delete cascade,
+  user_id     uuid references public.profiles(id),
+  path        text not null unique,
+  created_at  timestamptz default now()
+);
+
+create index if not exists fotos_tag_idx     on public.fotos (tag_id, created_at desc);
+create index if not exists fotos_lectura_idx on public.fotos (lectura_id);
+
+-- El tope de 5 por visita se valida aca, no solo en la UI: el limite
+-- de la app es cosmetico y se saltea desde la consola del navegador.
+create or replace function public.check_max_fotos()
+returns trigger as $$
+begin
+  if new.lectura_id is not null
+     and (select count(*) from public.fotos where lectura_id = new.lectura_id) >= 5 then
+    raise exception 'Maximo 5 fotos por lectura';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists on_foto_insert on public.fotos;
+create trigger on_foto_insert
+  before insert on public.fotos
+  for each row execute function public.check_max_fotos();
+
+
+-- ============================================================
 -- 7. HELPER DE ROL
 -- ============================================================
 -- security definer es obligatorio: sin el, una politica RLS sobre
@@ -308,6 +353,78 @@ create policy "Admin gestiona writes" on public.tag_writes
   using (
     exists (select 1 from public.profiles
             where id = auth.uid() and rol = 'admin')
+  );
+
+
+-- ---------- FOTOS ----------
+-- A diferencia de mantenimientos, aca el rol SI se valida en la
+-- politica. En mantenimientos quedo solo en la UI y eso significa que
+-- cualquier autenticado puede insertar desde la consola; no repetir.
+
+alter table public.fotos enable row level security;
+
+drop policy if exists "Ver fotos" on public.fotos;
+create policy "Ver fotos" on public.fotos
+  for select to authenticated
+  using (true);
+
+drop policy if exists "Operador y admin suben fotos" on public.fotos;
+create policy "Operador y admin suben fotos" on public.fotos
+  for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (select 1 from public.profiles
+                where id = auth.uid() and rol in ('admin','operador'))
+  );
+
+-- El operador puede borrar las suyas; el admin, cualquiera.
+drop policy if exists "Borrar fotos" on public.fotos;
+create policy "Borrar fotos" on public.fotos
+  for delete to authenticated
+  using (
+    exists (select 1 from public.profiles
+            where id = auth.uid() and rol = 'admin')
+    or (user_id = auth.uid()
+        and exists (select 1 from public.profiles
+                    where id = auth.uid() and rol = 'operador'))
+  );
+
+
+-- ============================================================
+-- 9. STORAGE  (bucket de fotos)
+-- ============================================================
+-- El bucket va PRIVADO: son fotos de instalaciones de clientes y no
+-- deben quedar accesibles adivinando la ruta. El dashboard las muestra
+-- con URLs firmadas (createSignedUrls), que caducan solas.
+--
+-- storage.objects ya viene con RLS activo desde Supabase; aca solo se
+-- agregan las politicas del bucket.
+
+insert into storage.buckets (id, name, public)
+values ('fotos-tags', 'fotos-tags', false)
+on conflict (id) do nothing;
+
+drop policy if exists "Ver fotos del bucket" on storage.objects;
+create policy "Ver fotos del bucket" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'fotos-tags');
+
+drop policy if exists "Subir fotos al bucket" on storage.objects;
+create policy "Subir fotos al bucket" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'fotos-tags'
+    and exists (select 1 from public.profiles
+                where id = auth.uid() and rol in ('admin','operador'))
+  );
+
+drop policy if exists "Borrar fotos del bucket" on storage.objects;
+create policy "Borrar fotos del bucket" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'fotos-tags'
+    and exists (select 1 from public.profiles
+                where id = auth.uid() and rol in ('admin','operador'))
   );
 
 
