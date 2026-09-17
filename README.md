@@ -51,3 +51,10 @@ python -m http.server 8080
 
 Abrir `http://localhost:8080/index.html`. No sirve abrir el archivo con
 doble clic: `file://` es un origen unico y Supabase no autentica.
+
+El sintoma es confuso — el login **no da error**: pones las credenciales, la
+pantalla no cambia y parece que la contraseña esta mal. Lo que pasa es que el
+cliente de Supabase guarda la sesion en `localStorage`, y en un origen opaco
+escribir ahi lanza `SecurityError`. Si el login no avanza y no muestra ningun
+error, lo primero es mirar la barra de direcciones: tiene que decir
+`http://localhost:...`, no `file://` ni `data:`.
