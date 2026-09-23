@@ -294,9 +294,34 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
 
 ## Pendientes / ideas
 
-- Editar tags (nombre, lugar, coordenadas) desde el dashboard; hoy solo se
-  crean desde la PWA.
-- UI para crear clientes (hoy por SQL).
+- **Vista "Clientes" en el dashboard (superadmin):** alta de clientes y mover
+  tags entre clientes junto con su historial. Hoy ambas cosas son por SQL; la
+  consulta para mover un tag (tag + lecturas + mantenimientos + fotos +
+  auditoria en un solo WITH) esta al pie de `migracion_clientes.sql`. Mover un
+  tag no mueve a sus operadores: hay que reasignarlos en Usuarios.
+- **Soporte iPhone (plan listo, sin ejecutar).** No hace falta version
+  aparte: iPhone XS o superior lee el tag NFC en segundo plano y abre Safari
+  con la URL, sin app. Alcance acordado: solo `pwa.html`. Corregir:
+  1. CRITICO — `comprimir()`: fotos de 48 MP pueden dar un canvas en negro
+     SIN error en Safari (tope de memoria de canvas) y se subiria una foto
+     vacia. Escalado por pasos + detectar lienzo vacio con getImageData.
+  2. `100vh` → `100dvh` en `#scr-login` y `#scr-app` (la barra de Safari corta).
+  3. `viewport-fit=cover` + `env(safe-area-inset-*)` en `.hdr` y `#scr-reading`.
+  4. Verificar en dispositivo si `capture` abre la camara o un selector.
+  5. Documentar: Safari (ITP) borra la sesion tras 7 dias sin uso.
+  6. Menores: `apple-touch-icon`; `user-scalable=no` es ignorado por iOS.
+  Solo se prueba en un iPhone real tras publicar: foto vertical y horizontal
+  (ni negras ni rotadas).
+- **API para integracion de clientes.** El requisito previo (multi-cliente)
+  ya esta hecho y verificado. Diseno acordado: Supabase Edge Functions como
+  capa intermedia, solo lectura, versionada (/v1/), API keys por cliente
+  guardadas cifradas, paginacion y sincronizacion incremental. Falta:
+  `updated_at` con trigger en lecturas, mantenimientos y tags (sin eso el
+  cliente no se entera de cambios de estado); la API en si; documentacion
+  OpenAPI + entorno de pruebas; y pasar Supabase a plan pago antes de
+  produccion (el Free pausa el proyecto). No exponer correos de operadores.
+  Ojo: introduce codigo de servidor con despliegue por CLI, algo que hoy el
+  proyecto no tiene.
 - Cola offline con IndexedDB para lecturas sin señal (se diseño, no se
   implemento en la version URL-based).
 - Volumen de tiles: OSM sirve para piloto, no para operacion masiva.
