@@ -1014,7 +1014,7 @@ function updateTagURL() {
   const uid = qs('#a-uid').value.trim();
   const nombre = qs('#a-nombre').value.trim();
   if (uid) {
-    const url = PWA_URL + '/?uid=' + encodeURIComponent(uid);
+    const url = PWA_URL + '?uid=' + encodeURIComponent(uid);
     qs('#url-val').textContent = url;
     qs('#url-box').classList.add('show');
     qs('#adm-steps').style.display = 'block';
@@ -1103,7 +1103,7 @@ async function loadAdminTags() {
   if (error) { list.innerHTML = '<div class="no-items">Error: ' + error.message + '</div>'; return; }
   if (!data?.length) { list.innerHTML = '<div class="no-items">Sin tags registrados</div>'; return; }
   list.innerHTML = data.map(t => {
-    const url = PWA_URL + '/?uid=' + encodeURIComponent(t.uid);
+    const url = PWA_URL + '?uid=' + encodeURIComponent(t.uid);
     return `
     <div class="read-item" style="flex-direction:column;align-items:flex-start;gap:6px">
       <div style="display:flex;width:100%;align-items:center;gap:8px">
