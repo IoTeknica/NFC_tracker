@@ -1,23 +1,36 @@
 -- ============================================================
--- NFC Tracker — esquema completo de Supabase
--- IoTeknica
+-- MIGRACION: clientes (multi-empresa) y rol superadmin
+-- NFC Tracker — IoTeknica
 --
--- Refleja el estado actual en produccion, incluidas todas las
--- correcciones aplicadas sobre la marcha. Ejecutable de cero
--- en un proyecto nuevo.
+-- Correr UNA sola vez, completa, en el SQL Editor de Supabase.
+-- Va dentro de una transaccion: si cualquier paso falla, no se
+-- aplica NADA y la base queda exactamente como estaba.
 --
--- Multi-cliente: cada fila pertenece a un cliente y la base decide
--- quien la ve. Para pasar una base existente a este modelo se uso
--- migracion_clientes.sql (una sola vez).
+-- Que hace:
+--   1. Crea la tabla clientes y un cliente inicial 'IoTeknica'.
+--   2. Agrega cliente_id a profiles, tags, lecturas, mantenimientos,
+--      fotos y audit_log, y rellena los datos existentes.
+--   3. Los 'admin' actuales pasan a 'superadmin' (ven todos los
+--      clientes). Operadores, users y todos los tags existentes quedan
+--      en el cliente 'IoTeknica'; despues se reasignan a mano.
+--   4. Reescribe las politicas RLS para aislar cada cliente.
 --
--- El bloque de helpers, triggers y politicas es IDENTICO al de
--- migracion_clientes.sql (entre las marcas "BLOQUE COMPARTIDO").
--- Si se cambia en un archivo, cambiarlo en el otro.
+-- No borra ningun dato. Si se quiere empezar limpio, hacerlo despues
+-- y por separado.
+--
+-- DESPUES de correrla, subir index.html y pwa.html nuevos enseguida:
+-- el dashboard publicado hoy no reconoce el rol 'superadmin', y hasta
+-- que se actualice, los botones de administrador aparecen deshabilitados.
+-- Los operadores pueden seguir trabajando con la PWA vieja sin problema.
+--
+-- Despues, correr verificar_clientes.sql para comprobar el aislamiento.
 -- ============================================================
+
+begin;
 
 
 -- ============================================================
--- 0. CLIENTES
+-- 1. CLIENTES
 -- ============================================================
 -- Borrar un cliente con datos falla a proposito (FK sin cascade): para
 -- dar de baja un cliente se lo desactiva (activo = false), lo que corta
@@ -30,201 +43,92 @@ create table if not exists public.clientes (
   created_at  timestamptz default now()
 );
 
+insert into public.clientes (nombre) values ('IoTeknica')
+on conflict (nombre) do nothing;
+
 
 -- ============================================================
--- 1. PROFILES
+-- 2. COLUMNA cliente_id
 -- ============================================================
--- Roles:
---   superadmin → IoTeknica. Ve todos los clientes. Sin cliente.
---   admin      → administra SU cliente. Cliente obligatorio.
---   operador   → equipo de terreno de su cliente. Cliente obligatorio.
---   user       → solo lectura. Sin cliente = cuenta "pendiente de
---                asignar", que no ve nada. Es el estado de toda
---                cuenta nueva.
+-- Se denormaliza en cada tabla (en vez de deducirla por join con tags)
+-- por tres motivos: las politicas RLS quedan simples y rapidas, cubre
+-- lecturas de tags no registrados (tag_id null), y el historial de
+-- audit_log y fotos conserva su cliente aunque se borre la lectura.
 
-create table if not exists public.profiles (
-  id          uuid primary key references auth.users(id) on delete cascade,
-  email       text not null,
-  nombre      text,
-  rol         text not null default 'user',
-  cliente_id  uuid references public.clientes(id),
-  created_at  timestamptz default now(),
-  constraint profiles_rol_check
-    check (rol in ('superadmin', 'admin', 'operador', 'user')),
-  constraint profiles_cliente_segun_rol check (
-       (rol = 'superadmin' and cliente_id is null)
-    or (rol in ('admin', 'operador') and cliente_id is not null)
-    or  rol = 'user')
-);
+alter table public.profiles       add column if not exists cliente_id uuid references public.clientes(id);
+alter table public.tags           add column if not exists cliente_id uuid references public.clientes(id);
+alter table public.lecturas       add column if not exists cliente_id uuid references public.clientes(id);
+alter table public.mantenimientos add column if not exists cliente_id uuid references public.clientes(id);
+alter table public.fotos          add column if not exists cliente_id uuid references public.clientes(id);
+alter table public.audit_log      add column if not exists cliente_id uuid references public.clientes(id);
 
--- Crea el perfil automaticamente al registrarse un usuario. Queda como
--- 'user' sin cliente: el cliente lo asigna despues un admin.
-create or replace function public.handle_new_user()
-returns trigger as $$
+
+-- ============================================================
+-- 3. ROLES: admin -> superadmin
+-- ============================================================
+-- El orden importa: primero se quita el check viejo, porque el update
+-- a 'superadmin' lo violaria.
+
+alter table public.profiles drop constraint if exists profiles_rol_check;
+update public.profiles set rol = 'superadmin' where rol = 'admin';
+alter table public.profiles add constraint profiles_rol_check
+  check (rol in ('superadmin', 'admin', 'operador', 'user'));
+
+
+-- ============================================================
+-- 4. RELLENO DE DATOS EXISTENTES
+-- ============================================================
+-- Va ANTES de crear los triggers nuevos, para que no intervengan.
+
+do $$
+declare
+  c_ini uuid := (select id from public.clientes where nombre = 'IoTeknica');
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email)
-  on conflict (id) do nothing;
-  return new;
-end;
-$$ language plpgsql security definer;
+  update public.profiles set cliente_id = c_ini
+   where rol <> 'superadmin' and cliente_id is null;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+  update public.tags set cliente_id = c_ini where cliente_id is null;
+
+  update public.lecturas l set cliente_id = coalesce(
+      (select t.cliente_id from public.tags t     where t.id = l.tag_id),
+      (select p.cliente_id from public.profiles p where p.id = l.user_id),
+      c_ini)
+   where l.cliente_id is null;
+
+  update public.mantenimientos m set cliente_id = coalesce(
+      (select t.cliente_id from public.tags t where t.id = m.tag_id), c_ini)
+   where m.cliente_id is null;
+
+  update public.fotos f set cliente_id = coalesce(
+      (select t.cliente_id from public.tags t where t.id = f.tag_id), c_ini)
+   where f.cliente_id is null;
+
+  update public.audit_log a set cliente_id = coalesce(
+      (select l.cliente_id from public.lecturas l where l.id = a.lectura_id), c_ini)
+   where a.cliente_id is null;
+end $$;
 
 
 -- ============================================================
--- 2. TAGS
+-- 5. RESTRICCIONES E INDICES
 -- ============================================================
--- uid = identificador que viaja en la URL grabada en el chip
---       (ej: 'TAG001'), NO el serial number del chip NFC.
---       Es unico en TODO el sistema, no por cliente: la URL del chip
---       no dice de que cliente es.
+-- lecturas.cliente_id y audit_log.cliente_id quedan nullables: un
+-- superadmin puede escanear un tag no registrado, y esa lectura no
+-- pertenece a ningun cliente.
 
-create table if not exists public.tags (
-  id           uuid primary key default gen_random_uuid(),
-  uid          text unique not null,
-  nombre       text not null,
-  lugar        text not null,
-  descripcion  text,
-  lat          float8,
-  lng          float8,
-  cliente_id   uuid not null references public.clientes(id),
-  created_by   uuid references public.profiles(id),
-  created_at   timestamptz default now(),
-  updated_at   timestamptz default now()
+alter table public.tags           alter column cliente_id set not null;
+alter table public.mantenimientos alter column cliente_id set not null;
+alter table public.fotos          alter column cliente_id set not null;
+
+-- superadmin: sin cliente. admin y operador: con cliente obligatorio.
+-- user: puede quedar sin cliente — es el estado "pendiente de asignar"
+-- de toda cuenta nueva, y en ese estado no ve nada.
+alter table public.profiles drop constraint if exists profiles_cliente_segun_rol;
+alter table public.profiles add constraint profiles_cliente_segun_rol check (
+     (rol = 'superadmin' and cliente_id is null)
+  or (rol in ('admin', 'operador') and cliente_id is not null)
+  or  rol = 'user'
 );
-
-
--- ============================================================
--- 3. LECTURAS
--- ============================================================
--- cliente_id nullable: un superadmin puede escanear un tag no
--- registrado, y esa lectura no pertenece a ningun cliente.
-
-create table if not exists public.lecturas (
-  id          uuid primary key default gen_random_uuid(),
-  tag_id      uuid references public.tags(id) on delete cascade,
-  user_id     uuid references public.profiles(id),
-  lat         float8,
-  lng         float8,
-  estado      text not null default 'pendiente'
-              check (estado in ('pendiente','revisado','aprobado','rechazado')),
-  leido_en    timestamptz not null default now(),
-  cliente_id  uuid references public.clientes(id),
-  created_at  timestamptz default now()
-);
-
-
--- ============================================================
--- 4. AUDIT_LOG
--- ============================================================
--- Inmutable. Solo escribe el trigger log_estado_change (definido en el
--- bloque compartido), nadie lo edita ni borra.
---
--- OJO: el FK va con ON DELETE SET NULL. Con el default (RESTRICT)
--- borrar una lectura que tiene auditoria falla con
--- "violates foreign key constraint audit_log_lectura_id_fkey".
--- cliente_id se copia de la lectura, asi el registro sigue visible para
--- el admin de su cliente aunque la lectura se borre.
-
-create table if not exists public.audit_log (
-  id               uuid primary key default gen_random_uuid(),
-  lectura_id       uuid references public.lecturas(id) on delete set null,
-  changed_by       uuid references public.profiles(id),
-  estado_anterior  text,
-  estado_nuevo     text,
-  cliente_id       uuid references public.clientes(id),
-  created_at       timestamptz default now()
-);
-
-
--- ============================================================
--- 5. MANTENIMIENTOS
--- ============================================================
--- Los crea el operador en terreno; el admin los aprueba.
-
-create table if not exists public.mantenimientos (
-  id          uuid primary key default gen_random_uuid(),
-  tag_id      uuid references public.tags(id) on delete cascade,
-  user_id     uuid references public.profiles(id),
-  texto       text not null,
-  estado      text not null default 'borrador'
-              check (estado in ('borrador','aprobado','rechazado')),
-  cliente_id  uuid not null references public.clientes(id),
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
-);
-
-
--- ============================================================
--- 6. TAG_WRITES  (auditoria de escritura de chips)
--- ============================================================
--- Sin uso por ahora: la escritura de chips se hace con NFC Tools.
-
-create table if not exists public.tag_writes (
-  id          uuid primary key default gen_random_uuid(),
-  tag_id      uuid references public.tags(id),
-  written_by  uuid references public.profiles(id),
-  payload     jsonb not null,
-  created_at  timestamptz default now()
-);
-
-
--- ============================================================
--- 6b. FOTOS  (fotografias del punto, tomadas en terreno)
--- ============================================================
--- Una foto pertenece a UNA visita (lectura_id) y se agrupa por punto
--- (tag_id). El tag_id esta denormalizado a proposito: el panel del
--- dashboard consulta por tag y asi evita el join con lecturas.
---
--- lectura_id va con ON DELETE SET NULL, igual que audit_log: borrar una
--- lectura no debe hacer desaparecer la evidencia fotografica del punto.
---
--- 'path' es la ruta dentro del bucket de Storage, con el formato
---   <tag_id>/<lectura_id>/<uuid>.jpg
--- La primera carpeta (tag_id) es la que usan las politicas del bucket
--- para decidir de que cliente es cada archivo.
--- El archivo en si NO vive en Postgres.
-
-create table if not exists public.fotos (
-  id          uuid primary key default gen_random_uuid(),
-  lectura_id  uuid references public.lecturas(id) on delete set null,
-  tag_id      uuid references public.tags(id) on delete cascade,
-  user_id     uuid references public.profiles(id),
-  path        text not null unique,
-  cliente_id  uuid not null references public.clientes(id),
-  created_at  timestamptz default now()
-);
-
-create index if not exists fotos_tag_idx     on public.fotos (tag_id, created_at desc);
-create index if not exists fotos_lectura_idx on public.fotos (lectura_id);
-
--- El tope de 5 por visita se valida aca, no solo en la UI: el limite
--- de la app es cosmetico y se saltea desde la consola del navegador.
-create or replace function public.check_max_fotos()
-returns trigger as $$
-begin
-  if new.lectura_id is not null
-     and (select count(*) from public.fotos where lectura_id = new.lectura_id) >= 5 then
-    raise exception 'Maximo 5 fotos por lectura';
-  end if;
-  return new;
-end;
-$$ language plpgsql;
-
-drop trigger if exists on_foto_insert on public.fotos;
-create trigger on_foto_insert
-  before insert on public.fotos
-  for each row execute function public.check_max_fotos();
-
-
--- ============================================================
--- 6c. INDICES POR CLIENTE
--- ============================================================
--- Todas las politicas filtran por cliente_id.
 
 create index if not exists profiles_cliente_idx       on public.profiles (cliente_id);
 create index if not exists tags_cliente_idx           on public.tags (cliente_id);
@@ -232,73 +136,6 @@ create index if not exists lecturas_cliente_idx       on public.lecturas (client
 create index if not exists mantenimientos_cliente_idx on public.mantenimientos (cliente_id);
 create index if not exists fotos_cliente_idx          on public.fotos (cliente_id);
 create index if not exists audit_log_cliente_idx      on public.audit_log (cliente_id);
-
-
--- ============================================================
--- 7. HELPER DE ROL (heredado)
--- ============================================================
--- Sin uso desde el modelo multi-cliente: las politicas usan los helpers
--- del bloque compartido (mi_rol, mi_cliente, es_superadmin, admin_de,
--- equipo_de). La usaba "Ver perfil propio", una politica creada a mano
--- en el panel que nunca estuvo en este archivo y que la migracion
--- elimina. Se conserva por si algo externo la invoca.
--- security definer es obligatorio: sin el, una politica RLS sobre
--- profiles que consulte profiles entra en recursion infinita.
-
-create or replace function public.get_my_rol()
-returns text as $$
-  select rol from public.profiles where id = auth.uid();
-$$ language sql security definer stable;
-
-
--- ============================================================
--- 8. ROW LEVEL SECURITY — activacion y permisos de columna
--- ============================================================
-
-alter table public.profiles       enable row level security;
-alter table public.tags           enable row level security;
-alter table public.lecturas       enable row level security;
-alter table public.audit_log      enable row level security;
-alter table public.mantenimientos enable row level security;
-alter table public.tag_writes     enable row level security;
-alter table public.fotos          enable row level security;
-
--- Cada usuario puede editar su propio perfil...
-drop policy if exists "Editar perfil propio" on public.profiles;
-create policy "Editar perfil propio" on public.profiles
-  for update to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
-
--- ...pero SOLO la columna 'nombre'. La politica de arriba limita QUE
--- fila se edita, no QUE columnas: sin esto, cualquiera se hacia admin
--- con update({rol:'admin'}) sobre su propio perfil, o se cambiaba de
--- cliente con update({cliente_id: ...}).
---
--- El orden importa: Supabase otorga UPDATE sobre toda la tabla a
--- 'authenticated' por defecto, y un revoke por columna NO anula un
--- permiso de tabla — hay que quitar el de tabla y volver a otorgar
--- solo la columna que si se puede editar.
---
--- rol y cliente_id se cambian solo con asignar_usuario() /
--- quitar_usuario() (bloque compartido) o desde el SQL Editor.
-
-revoke update on public.profiles from authenticated;
-grant  update (nombre) on public.profiles to authenticated;
-
-
--- ============================================================
--- 9. STORAGE  (bucket de fotos)
--- ============================================================
--- El bucket va PRIVADO: son fotos de instalaciones de clientes y no
--- deben quedar accesibles adivinando la ruta. El dashboard las muestra
--- con URLs firmadas (createSignedUrls), que caducan solas.
--- storage.objects ya viene con RLS activo desde Supabase; sus politicas
--- estan en el bloque compartido.
-
-insert into storage.buckets (id, name, public)
-values ('fotos-tags', 'fotos-tags', false)
-on conflict (id) do nothing;
 
 
 -- >>> INICIO BLOQUE COMPARTIDO CON schema.sql >>>
@@ -776,11 +613,15 @@ grant  execute on function public.quitar_usuario(text) to authenticated;
 -- <<< FIN BLOQUE COMPARTIDO CON schema.sql <<<
 
 
+-- Que PostgREST recargue el esquema y reconozca las columnas nuevas.
+notify pgrst, 'reload schema';
+
+commit;
+
+
 -- ============================================================
--- OPERACIONES FRECUENTES
+-- OPERACIONES FRECUENTES (despues de migrar)
 -- ============================================================
--- Asignar usuarios y roles de cliente se hace desde el dashboard
--- (vista Usuarios). Lo que sigue es solo para el SQL Editor.
 
 -- Crear un cliente
 --   insert into public.clientes (nombre) values ('Minera Los Andes');
@@ -788,25 +629,11 @@ grant  execute on function public.quitar_usuario(text) to authenticated;
 -- Ver los clientes y sus ids
 --   select id, nombre, activo from public.clientes order by nombre;
 
--- Designar un superadmin (NUNCA desde la app, a proposito)
---   update public.profiles set rol = 'superadmin', cliente_id = null
---    where email = 'x@ioteknica.cl';
-
--- Asignar un usuario a un cliente con su rol (equivale a lo que hace
--- el dashboard)
+-- Asignar un usuario a un cliente con su rol
 --   update public.profiles
 --      set rol = 'admin',
 --          cliente_id = (select id from public.clientes where nombre = 'Minera Los Andes')
 --    where email = 'jefe@minera.cl';
-
--- Poner nombre a un usuario creado desde el panel de Supabase
--- (el trigger solo copia el email)
---   update public.profiles set nombre = 'J. Belaustegui' where email = 'x@y.com';
-
--- Crear el perfil a mano si el trigger no alcanzo a dispararse
---   insert into public.profiles (id, email, rol)
---   select id, email, 'superadmin' from auth.users where email = 'x@y.com'
---   on conflict (id) do update set rol = 'superadmin';
 
 -- Mover un tag (y su historial) a otro cliente
 --   with c as (select id from public.clientes where nombre = 'Minera Los Andes'),
@@ -818,9 +645,3 @@ grant  execute on function public.quitar_usuario(text) to authenticated;
 
 -- Dar de baja un cliente sin borrar su historial
 --   update public.clientes set activo = false where nombre = 'Minera Los Andes';
-
--- Tag de prueba (desde el SQL Editor hay que indicar el cliente)
---   insert into public.tags (uid, nombre, lugar, lat, lng, cliente_id)
---   values ('TAG001', 'Rack principal', 'Sala de servidores',
---           -33.4489, -70.6693,
---           (select id from public.clientes where nombre = 'IoTeknica'));

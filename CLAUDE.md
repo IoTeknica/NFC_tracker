@@ -69,12 +69,21 @@ admin la pega en NFC Tools (Write → Add a record → URL) y la graba en el chi
 
 ## Modelo de datos
 
-Seis tablas en Supabase, todas con RLS activo, mas un bucket de Storage:
+Siete tablas en Supabase, todas con RLS activo, mas un bucket de Storage.
+**Es multi-cliente**: cada fila pertenece a un cliente y la base decide quien
+la ve.
 
-- **profiles** — extiende `auth.users`. Campo `rol`: `admin` | `operador` | `user`.
-  Un trigger `handle_new_user` crea la fila al registrarse.
+- **clientes** — las organizaciones. `activo = false` corta el acceso de
+  todos sus usuarios sin borrar historial. Borrar un cliente con datos falla
+  a proposito (FK sin cascade): se desactiva, no se borra.
+- **profiles** — extiende `auth.users`. `rol`: `superadmin` | `admin` |
+  `operador` | `user`. `cliente_id`: obligatorio para admin y operador, nulo
+  para superadmin, opcional para user. Un trigger `handle_new_user` crea la
+  fila al registrarse, como `user` sin cliente.
 - **tags** — el tag fisico. `uid` es el identificador que viaja en la URL
-  (ej: `TAG001`), no el serial del chip. Nombre, lugar, lat/lng.
+  (ej: `TAG001`), no el serial del chip. Nombre, lugar, lat/lng. `uid` es
+  unico en TODO el sistema, no por cliente: la URL del chip no dice de que
+  cliente es.
 - **lecturas** — evento de escaneo. `estado`: `pendiente` | `revisado` |
   `aprobado` | `rechazado`.
 - **mantenimientos** — texto libre asociado a un tag. `estado`: `borrador` |
@@ -87,43 +96,76 @@ Seis tablas en Supabase, todas con RLS activo, mas un bucket de Storage:
   esta en el bucket. `lectura_id` va con `ON DELETE SET NULL`: borrar una
   lectura no debe hacer desaparecer la evidencia del punto.
 
-El bucket `fotos-tags` es **privado**. El dashboard muestra las fotos con URLs
-firmadas (`createSignedUrls`), que caducan solas.
+**`cliente_id` esta denormalizado** en profiles, tags, lecturas,
+mantenimientos, fotos y audit_log, en vez de deducirse por join con tags: las
+politicas quedan simples y rapidas, cubre lecturas de tags no registrados, y el
+historial conserva su cliente aunque se borre la lectura.
 
-El esquema completo con politicas RLS esta en `schema.sql`.
+**El cliente de cada fila lo pone la base, nunca el navegador.** Triggers
+`security definer` lo asignan al insertar y rechazan colgar una lectura,
+mantenimiento o foto de un tag de otro cliente. Una cuenta sin cliente activo
+no puede registrar lecturas.
+
+El bucket `fotos-tags` es **privado**. El dashboard muestra las fotos con URLs
+firmadas (`createSignedUrls`), que caducan solas. Sus politicas deciden el
+cliente de cada archivo por la primera carpeta de la ruta (el `tag_id`).
+
+El esquema completo esta en `schema.sql`. La base de produccion se paso al
+modelo multi-cliente una sola vez con `migracion_clientes.sql`, y
+`verificar_clientes.sql` comprueba el aislamiento contra la base real.
 
 ## Roles
 
-| Accion | user | operador | admin |
-|---|---|---|---|
-| Leer tags | si | si | si |
-| Ver historial propio | si | si | si |
-| Agregar mantenimiento | no | si | si |
-| Agregar fotos del punto | no | si | si |
-| Aprobar mantenimientos | no | no | si |
-| Registrar tags | no | no | si |
-| Cambiar estado de lecturas | no | no | si |
-| Borrar lecturas | no | no | si |
-| Acceso al dashboard | no | no | si |
+`superadmin` es IoTeknica y ve todos los clientes. Dentro de cada cliente hay
+`admin`, `operador` y `user`.
 
-El rol se asigna por SQL; no hay UI para cambiarlo. Y no la puede haber
-mientras el rol siga siendo intocable desde el cliente — `authenticated` no
-tiene permiso de UPDATE sobre `profiles.rol`, a proposito (ver Trampas).
-El panel de invitacion genera este SQL listo para copiar:
+| Accion | user | operador | admin | superadmin |
+|---|---|---|---|---|
+| Ver tags de su cliente | si | si | si | todos |
+| Ver sus propias lecturas | si | si | todas las del cliente | todas |
+| Ver mantenimientos | si | si | si | todos |
+| Agregar mantenimiento | no | si | si | si |
+| Ver y agregar fotos del punto | no | si | si | si |
+| Aprobar mantenimientos | no | no | si | si |
+| Registrar tags | no | no | en su cliente | en cualquiera |
+| Cambiar estado / borrar lecturas | no | no | si | si |
+| Gestionar operadores y users | no | no | de su cliente | de todos |
+| Designar admins de cliente | no | no | no | si |
+| Acceso al dashboard | no | no | si | si |
+
+**Todo se valida en la base** (RLS, triggers y permisos de columna). La
+interfaz solo decide que botones mostrar. Antes habia dos excepciones —alta de
+mantenimientos y acceso al dashboard se controlaban solo en la UI—; ambas se
+cerraron con el modelo multi-cliente. Es el criterio a seguir.
+
+Por que `superadmin` aparte y no "operador con atribuciones de admin": el
+operador ejecuta y el admin supervisa, fundirlos anula la aprobacion. Y falla
+hacia el lado seguro: el error natural al dar de alta al admin de un cliente
+(escribir `admin`) le da acceso solo a su cliente; el acceso global exige
+escribir `superadmin` a proposito.
+
+### Como se asignan roles y clientes
+
+`rol` y `cliente_id` NO se pueden editar desde el navegador: la unica columna
+de `profiles` con permiso de UPDATE para `authenticated` es `nombre` (ver
+Trampas). Hay dos puertas, y solo dos:
+
+1. **Dashboard, vista Usuarios** — usa las funciones `asignar_usuario()` y
+   `quitar_usuario()` de la base, con limites explicitos:
+   - el admin de un cliente asigna solo `operador` o `user`, solo en su
+     cliente, solo sobre cuentas sin asignar o ya suyas, nunca sobre otro admin;
+   - el superadmin asigna `admin`, `operador` o `user` en cualquier cliente;
+   - si el correo es de otro cliente, el mensaje es "no esta disponible", sin
+     revelar de quien es.
+   La invitacion intenta asignar ANTES de enviar el correo, asi una cuenta de
+   otro cliente se rechaza sin mandarle nada a nadie.
+2. **SQL Editor** — lo unico que queda fuera de la app, a proposito: crear
+   clientes y designar superadmins.
 
 ```sql
-UPDATE public.profiles SET rol = 'operador' WHERE email = 'x@y.com';
+insert into public.clientes (nombre) values ('Minera Los Andes');
+update public.profiles set rol = 'superadmin', cliente_id = null where email = 'x@ioteknica.cl';
 ```
-
-Dos filas de la tabla de arriba se aplican solo en la UI, no en la base:
-**agregar mantenimiento** (la politica RLS deja insertar a cualquier
-autenticado) y **acceso al dashboard** (no hay control de rol al entrar; el
-menu de gestion se oculta con CSS). Un `user` que abra la consola puede
-listar `profiles` y `mantenimientos` completos.
-
-**Fotos no**: ahi el rol se valida en la politica RLS, tanto en la tabla como
-en el bucket. Es el criterio a seguir de aqui en adelante.
-
 
 ## Fotos del punto
 
@@ -191,6 +233,33 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
   entidades del atributo ANTES de pasar el texto al parser de JS, asi que un
   `&#39;` vuelve a ser comilla y rompe el string igual. Los datos de usuario
   que necesita un handler van en `data-*` y se leen con `dataset`.
+- **`migracion_clientes.sql` y `schema.sql` comparten un bloque identico**
+  (helpers, triggers, politicas y funciones de usuarios), entre las marcas
+  `>>> INICIO BLOQUE COMPARTIDO` y `<<< FIN BLOQUE COMPARTIDO`. Si se cambia
+  una politica, cambiarla en los dos, o schema.sql deja de reflejar produccion.
+- **Desde el SQL Editor, `auth.uid()` es nulo** y los triggers lo interpretan
+  como "proceso de servidor": respetan el `cliente_id` que se indique. Por eso
+  crear un tag a mano exige pasar `cliente_id` — sin el falla con "Indica a
+  que cliente pertenece el tag".
+- **`verificar_clientes.sql` termina en ERROR a proposito.** Lanza una excepcion
+  con el informe para que Postgres deshaga todos los datos de prueba. Leer el
+  mensaje: si dice "N de N correctas", esta todo bien.
+- **Un admin no distingue "UID inexistente" de "UID de otro cliente".** La RLS
+  le oculta los tags ajenos. Al registrar un UID que ya usa otro cliente, recibe
+  "Ese UID ya esta en uso" sin saber de quien es; y al escanearlo, "no registrado
+  o no pertenece a tu organizacion". Es a proposito.
+- **Los embeds a `clientes` llevan hint de FK** (`clientes!profiles_cliente_id_fkey`,
+  `clientes!lecturas_cliente_id_fkey`): con `cliente_id` en seis tablas, mejor
+  no dejar que PostgREST adivine el camino.
+- **Una politica creada a mano en el panel de Supabase no aparece en
+  `schema.sql`, y sigue activa.** Paso con "Ver perfil propio" en `profiles`:
+  `(id = auth.uid()) OR (get_my_rol() = 'admin')`. Nunca estuvo en el
+  archivo, asi que la migracion multi-cliente no la reemplazo; y como `admin`
+  paso a significar "admin de UN cliente", le abria a cada admin los perfiles
+  de todos los clientes. La detecto `verificar_clientes.sql`. Las politicas son
+  permisivas y se suman: una sola de mas alcanza para abrir una fuga. Nunca
+  crear politicas desde el panel sin agregarlas a `schema.sql`, y ante la duda
+  listar lo que realmente hay con `select * from pg_policies`.
 - **`get_my_rol()` debe ser `security definer`** o las politicas RLS sobre
   `profiles` entran en recursion infinita.
 - **`getSession()` y `onAuthStateChange` juntos causan loop.** Solo uno maneja
@@ -227,7 +296,7 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
 
 - Editar tags (nombre, lugar, coordenadas) desde el dashboard; hoy solo se
   crean desde la PWA.
-- UI para cambiar roles sin pasar por SQL.
+- UI para crear clientes (hoy por SQL).
 - Cola offline con IndexedDB para lecturas sin señal (se diseño, no se
   implemento en la version URL-based).
 - Volumen de tiles: OSM sirve para piloto, no para operacion masiva.

@@ -32,7 +32,12 @@ el navegador sigue mostrando la version anterior.
    (la URL va **sin** `/rest/v1`)
 4. Authentication → URL Configuration → agregar la URL de la PWA como
    Site URL y como Redirect URL
-5. Crear el primer usuario y darle rol admin por SQL
+5. Crear el primer usuario y darle rol `superadmin` por SQL
+   (`update public.profiles set rol = 'superadmin' where email = '...'`)
+6. Crear al menos un cliente
+   (`insert into public.clientes (nombre) values ('...')`). Desde ahi, los
+   admins de cada cliente y sus usuarios se gestionan en el dashboard,
+   vista Usuarios.
 
 ## Instalar un tag nuevo
 
