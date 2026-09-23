@@ -299,6 +299,14 @@ nav { padding: 14px 10px; flex: 1; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 .topbar-btns { display: flex; gap: 8px; align-items: center; }
+.filtro-cliente { max-width: 220px; cursor: pointer; color: var(--purple); border-color: var(--purple-d); }
+.filtro-cliente option { background: var(--surface); color: var(--text); }
+/* Nombre del cliente bajo el lugar, solo para el superadmin en "Todos" */
+.cliente-tag {
+  display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 20px;
+  font-size: 10px; font-family: 'DM Mono', monospace;
+  background: var(--purple-d); color: var(--purple);
+}
 .btn {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 14px; border-radius: 8px;
@@ -604,16 +612,23 @@ nav { padding: 14px 10px; flex: 1; }
 .view.active { display: block; }
 .panel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
 .panel-head { display: grid; gap: 8px; padding: 9px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
-.panel-head.users { grid-template-columns: minmax(0,1fr) minmax(0,1fr) 90px 120px; }
+.panel-head.users { grid-template-columns: minmax(0,1fr) minmax(0,1.2fr) 130px 110px 72px; }
 .panel-head.audit { grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) 100px; }
 .panel-row { display: grid; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: center; transition: background .1s; }
 .panel-row:last-child { border-bottom: none; }
 .panel-row:hover { background: var(--surface2); }
-.panel-row.users { grid-template-columns: minmax(0,1fr) minmax(0,1fr) 90px 120px; }
+.panel-row.users { grid-template-columns: minmax(0,1fr) minmax(0,1.2fr) 130px 110px 72px; }
 .panel-row.audit { grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) 100px; }
 .rol-badge { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-family:"DM Mono",monospace; }
 .rol-admin { background:var(--amber-d); color:var(--amber); }
 .rol-user  { background:var(--blue-d);  color:var(--blue); }
+.rol-super { background:var(--purple-d); color:var(--purple); }
+.rol-select {
+  width: 100%; padding: 4px 8px; border-radius: 8px; cursor: pointer;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-size: 11px; font-family: 'DM Mono', monospace;
+}
+.rol-select:disabled { opacity: .5; cursor: default; }
 .audit-from { color:var(--text-3); text-decoration:line-through; font-size:11px; }
 .audit-to   { color:var(--accent); font-size:12px; font-weight:500; }
 .view-title { font-family:"Syne",sans-serif; font-size:16px; font-weight:700; margin-bottom:4px; }
@@ -821,6 +836,11 @@ nav { padding: 14px 10px; flex: 1; }
         <div class="page-sub" id="sync-status"><span class="live-dot"></span>conectando…</div>
       </div>
       <div class="topbar-btns">
+        <!-- Solo superadmin: filtra todas las vistas por cliente -->
+        <select class="btn filtro-cliente" id="filtro-cliente" onchange="cambiarFiltroCliente(this.value)"
+                title="Filtrar por cliente" style="display:none">
+          <option value="">Todos los clientes</option>
+        </select>
         <button class="btn" onclick="exportCSV()">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Exportar CSV
@@ -1057,9 +1077,15 @@ nav { padding: 14px 10px; flex: 1; }
             onkeydown="if(event.key==='Enter') sendInvite()">
           <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">Rol</label>
           <select id="invite-rol" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:14px">
-            <option value="user">user — puede leer tags</option>
-            <option value="admin">admin — puede leer, escribir y cambiar estados</option>
+            <option value="operador">operador — registra lecturas, fotos y mantenimientos</option>
+            <option value="user">user — solo lee tags y sus lecturas</option>
+            <option value="admin" id="invite-rol-admin" hidden>admin — administra todo su cliente</option>
           </select>
+          <!-- Solo superadmin: el admin de cliente siempre agrega a su propia organización -->
+          <div id="invite-cliente-wrap" hidden>
+            <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">Cliente</label>
+            <select id="invite-cliente" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:14px"></select>
+          </div>
           <div style="display:flex;justify-content:flex-end;gap:8px">
             <button class="btn btn-ghost" onclick="closeInviteModal()">Cancelar</button>
             <button class="btn btn-accent" id="btn-invite" onclick="sendInvite()">Enviar invitación</button>
@@ -1073,6 +1099,7 @@ nav { padding: 14px 10px; flex: 1; }
             <div class="th">Email</div>
             <div class="th">Rol</div>
             <div class="th">Registrado</div>
+            <div class="th"></div>
           </div>
           <div id="users-body"><div class="empty-state" style="padding:24px">Cargando usuarios…</div></div>
         </div>
@@ -1130,7 +1157,22 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser   = null;
 let currentRole   = 'user';
+let currentCliente = null;   // { id, nombre } — null para el superadmin
+let filtroCliente  = '';     // solo superadmin: '' = todos los clientes
+let clientesLista  = [];     // solo superadmin
 let allLecturas   = [];
+
+/* Roles: superadmin (IoTeknica, todos los clientes) y, por cliente,
+   admin / operador / user. En la interfaz "puede administrar" es admin
+   O superadmin; lo que cada uno ve de verdad lo decide la base (RLS). */
+const esSuper = () => currentRole === 'superadmin';
+const esAdmin = () => currentRole === 'admin' || currentRole === 'superadmin';
+
+/* Superadmin con un cliente elegido en el selector: filtra la consulta.
+   Para el resto no hace falta — la RLS ya les limita a su cliente. */
+function porCliente(q) {
+  return (esSuper() && filtroCliente) ? q.eq('cliente_id', filtroCliente) : q;
+}
 let selectedId    = null;
 let editId        = null;
 let selSt         = null;
@@ -1178,32 +1220,55 @@ async function afterLogin(user) {
   showApp();
 
   try {
+    // Hint de FK explicito: con cliente_id en varias tablas, PostgREST
+    // puede encontrar mas de un camino (ver Trampas en CLAUDE.md).
     const { data: profile, error: profileError } = await sb
       .from('profiles')
-      .select('nombre, rol')
+      .select('nombre, rol, cliente_id, clientes!profiles_cliente_id_fkey(nombre)')
       .eq('id', user.id)
       .maybeSingle();
 
     if (profileError) console.warn('Perfil no encontrado:', profileError.message);
 
-    currentRole = profile?.rol || 'user';
+    currentRole    = profile?.rol || 'user';
+    currentCliente = profile?.cliente_id
+      ? { id: profile.cliente_id, nombre: profile.clientes?.nombre || '—' }
+      : null;
+
+    // El dashboard es solo para administradores. Antes cualquiera podia
+    // entrar y el menu de gestion se ocultaba con CSS; la RLS impedia
+    // leer los datos, pero la puerta estaba abierta.
+    if (!esAdmin()) {
+      // Decidir el mensaje ANTES de logout(), que reinicia rol y cliente.
+      const pendiente = currentRole === 'user' && !currentCliente;
+      await logout();
+      showError(pendiente
+        ? 'Tu cuenta aún no está asignada a una organización. Pídele al administrador que te agregue.'
+        : 'El dashboard es solo para administradores. Usa la app móvil en terreno.');
+      return;
+    }
+
+    // El selector de clientes es solo del superadmin. Fijarlo siempre
+    // segun el rol, sin depender de que logout() lo haya ocultado antes.
+    document.getElementById('filtro-cliente').style.display = 'none';
+
     const nombre = profile?.nombre || user.email.split('@')[0];
     const iniciales = nombre.split(' ').map(w => w[0]).join('').toUpperCase().substring(0,2);
 
     document.getElementById('sidebar-name').textContent = nombre;
-    document.getElementById('sidebar-role').textContent = '● ' + currentRole;
-    document.getElementById('sidebar-role').style.color = currentRole === 'admin' ? 'var(--amber)' : 'var(--text-3)';
+    document.getElementById('sidebar-role').textContent = esSuper()
+      ? '● superadmin'
+      : '● admin · ' + (currentCliente?.nombre || '—');
+    document.getElementById('sidebar-role').style.color = esSuper() ? 'var(--purple)' : 'var(--amber)';
 
     const av = document.getElementById('sidebar-avatar');
     av.textContent = iniciales;
-    av.className = 'avatar ' + (currentRole === 'admin' ? 'av-admin' : 'av-user');
+    av.className = 'avatar av-admin';
 
-    if (currentRole === 'admin') {
-      document.getElementById('app').classList.add('is-admin');
-      document.getElementById('btn-save-estado').disabled = false;
-    } else {
-      document.getElementById('btn-save-estado').disabled = true;
-    }
+    document.getElementById('app').classList.add('is-admin');
+    document.getElementById('btn-save-estado').disabled = false;
+
+    if (esSuper()) await cargarClientes();
 
     await loadData();
     subscribeRealtime();
@@ -1233,6 +1298,39 @@ async function loginMagic() {
   setBtnLoading(false);
   if (error) { showError(error.message); return; }
   showInfo('✓ Revisa tu correo — te enviamos el enlace de acceso.');
+}
+
+/* ── CLIENTES (solo superadmin) ────────────────────── */
+async function cargarClientes() {
+  const { data, error } = await sb.from('clientes')
+    .select('id, nombre, activo').order('nombre');
+  if (error) { console.warn('clientes:', error.message); return; }
+  clientesLista = data || [];
+
+  const sel = document.getElementById('filtro-cliente');
+  sel.innerHTML = '<option value="">Todos los clientes</option>' +
+    clientesLista.map(c =>
+      `<option value="${esc(c.id)}">${esc(c.nombre)}${c.activo ? '' : ' (inactivo)'}</option>`
+    ).join('');
+  sel.value = filtroCliente;
+  sel.style.display = '';
+}
+
+function cambiarFiltroCliente(id) {
+  filtroCliente = id;
+  selectedId = null; histSelectedId = null;
+  if      (currentView === 'tags')           loadData();
+  else if (currentView === 'historial')      loadHistorial();
+  else if (currentView === 'usuarios')       loadUsuarios();
+  else if (currentView === 'mantenimientos') loadMantenimientos();
+  else if (currentView === 'auditoria')      loadAuditoria();
+}
+
+/* Etiqueta de cliente bajo el lugar: solo tiene sentido para el
+   superadmin mirando "Todos"; en cualquier otro caso es ruido. */
+function etiquetaCliente(nombre) {
+  return (esSuper() && !filtroCliente && nombre)
+    ? `<div class="cliente-tag">${esc(nombre)}</div>` : '';
 }
 
 function toggleUserMenu(e) {
@@ -1271,6 +1369,9 @@ async function logout() {
   app.classList.remove('is-admin');
 
   currentUser = null; currentRole = 'user';
+  currentCliente = null; filtroCliente = ''; clientesLista = [];
+  const fc = document.getElementById('filtro-cliente');
+  fc.style.display = 'none'; fc.innerHTML = '<option value="">Todos los clientes</option>';
   allLecturas = []; allHistorial = [];
   selectedId = null; histSelectedId = null; histVisibleIds = [];
   editId = null; selSt = null;
@@ -1317,13 +1418,15 @@ async function loadData() {
   const hoy = new Date();
   hoy.setHours(0,0,0,0);
 
-  const { data, error } = await sb
+  const q = sb
     .from('lecturas')
     .select(`
       id, lat, lng, estado, leido_en,
       tags!lecturas_tag_id_fkey ( id, nombre, lugar, uid, lat, lng ),
-      profiles!lecturas_user_id_fkey ( id, nombre, rol, email )
-    `)
+      profiles!lecturas_user_id_fkey ( id, nombre, rol, email ),
+      clientes!lecturas_cliente_id_fkey ( nombre )
+    `);
+  const { data, error } = await porCliente(q)
     .gte('leido_en', hoy.toISOString())
     .order('leido_en', { ascending: false })
     .limit(100);
@@ -1345,6 +1448,7 @@ async function loadData() {
     tagLng:  r.tags?.lng,
     user:    r.profiles?.nombre || (r.profiles?.email ? r.profiles.email.split('@')[0] : '—'),
     rol:     r.profiles?.rol    || 'user',
+    cliente: r.clientes?.nombre || '',
     lat:     r.lat,
     lng:     r.lng,
     hora:    formatHora(r.leido_en),
@@ -1421,6 +1525,7 @@ function renderTable() {
       </div>
       <div>
         <div class="lugar-cell">${esc(r.lugar)}</div>
+        ${etiquetaCliente(r.cliente)}
       </div>
       <div>
         <div class="user-n">${esc(r.user)}</div>
@@ -1453,7 +1558,7 @@ function renderTable() {
         </button>
         <button class="icon-btn" title="Cambiar estado"
           onclick="event.stopPropagation();openModal('${r.id}','${r.estado}')"
-          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          ${!esAdmin() ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -1463,7 +1568,7 @@ function renderTable() {
       <div style="display:flex;gap:4px">
         <button class="icon-btn danger" title="Eliminar lectura"
           onclick="event.stopPropagation();deleteLectura('${r.id}')"
-          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          ${!esAdmin() ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
             <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -1503,7 +1608,7 @@ function selectRow(id) {
    MODAL DE ESTADO
    ============================================================= */
 function openModal(id, st) {
-  if (currentRole !== 'admin') return;
+  if (!esAdmin()) return;
   editId = id; selSt = st;
   const r = allLecturas.find(x => x.id === id);
   document.getElementById('modal-sub').textContent =
@@ -1529,7 +1634,7 @@ function highlightOpt(st) {
 }
 
 async function guardarEstado() {
-  if (!editId || !selSt || currentRole !== 'admin') return;
+  if (!editId || !selSt || !esAdmin()) return;
 
   const { error } = await sb
     .from('lecturas')
@@ -1743,13 +1848,15 @@ async function loadHistorial() {
   const body = document.getElementById('hist-body');
   body.innerHTML = '<div class="empty-state">Cargando…</div>';
 
-  const { data, error } = await sb
+  const q = sb
     .from('lecturas')
     .select(`
       id, lat, lng, estado, leido_en,
       tags!lecturas_tag_id_fkey ( id, nombre, lugar, uid ),
-      profiles!lecturas_user_id_fkey ( id, nombre, rol, email )
-    `)
+      profiles!lecturas_user_id_fkey ( id, nombre, rol, email ),
+      clientes!lecturas_cliente_id_fkey ( nombre )
+    `);
+  const { data, error } = await porCliente(q)
     .order('leido_en', { ascending: false })
     .limit(500);
 
@@ -1766,6 +1873,7 @@ async function loadHistorial() {
     uid:     r.tags?.uid        || '—',
     user:    r.profiles?.nombre || r.profiles?.email?.split('@')[0] || '—',
     rol:     r.profiles?.rol    || 'user',
+    cliente: r.clientes?.nombre || '',
     estado:  r.estado           || 'pendiente',
     hora:    r.leido_en         || '',
     horaFmt: formatDate(r.leido_en),
@@ -1831,7 +1939,10 @@ function renderHistorial(rows) {
         <div class="tag-n">${esc(r.tag)}</div>
         <div class="tag-uid-badge" style="margin-top:2px">${esc(r.uid)}</div>
       </div>
-      <div class="lugar-cell">${esc(r.lugar)}</div>
+      <div>
+        <div class="lugar-cell">${esc(r.lugar)}</div>
+        ${etiquetaCliente(r.cliente)}
+      </div>
       <div>
         <div class="user-n">${esc(r.user)}</div>
         <div class="user-r" style="color:${r.rol==='admin'?'var(--amber)':r.rol==='operador'?'var(--purple)':'var(--text-3)'}">
@@ -1841,8 +1952,8 @@ function renderHistorial(rows) {
       <div style="font-size:12px;color:var(--text-2);font-family:'DM Mono',monospace;line-height:1.5">
         ${r.horaFmt}
       </div>
-      <div><span class="pill ${stColors[r.estado]||''}${currentRole === 'admin' ? ' pill-edit' : ''}"
-        ${currentRole === 'admin'
+      <div><span class="pill ${stColors[r.estado]||''}${esAdmin() ? ' pill-edit' : ''}"
+        ${esAdmin()
           ? `onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')" title="Clic para cambiar el estado"`
           : 'title="Solo un admin puede cambiar el estado"'}>${r.estado}</span></div>
       <div class="row-actions">
@@ -1856,7 +1967,7 @@ function renderHistorial(rows) {
         </button>
         <button class="icon-btn" title="Cambiar estado"
           onclick="event.stopPropagation();openHistModal('${r.id}','${r.estado}')"
-          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          ${!esAdmin() ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -1864,7 +1975,7 @@ function renderHistorial(rows) {
         </button>
         <button class="icon-btn danger" title="Eliminar lectura"
           onclick="event.stopPropagation();deleteLectura('${r.id}')"
-          ${currentRole !== 'admin' ? 'disabled' : ''}>
+          ${!esAdmin() ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
             <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -2018,7 +2129,7 @@ document.addEventListener('keydown', e => {
 });
 
 function openHistModal(id, estado) {
-  if (currentRole !== 'admin') return;
+  if (!esAdmin()) return;
   // Reutiliza el modal compartido de .overlay-slot
   editId = id; selSt = estado;
   const r = allHistorial.find(x => x.id === id);
@@ -2088,7 +2199,7 @@ function switchView(name) {
 /* Sirve a las dos vistas: la lectura puede estar en allLecturas
    (Tags recientes), en allHistorial, o en ambas. */
 async function deleteLectura(id) {
-  if (currentRole !== 'admin') return;
+  if (!esAdmin()) return;
 
   const r = allLecturas.find(x => x.id === id) || allHistorial.find(x => x.id === id);
   const quien = r ? `"${r.tag}" · ${r.lugar}` : 'esta lectura';
@@ -2121,20 +2232,45 @@ async function deleteLectura(id) {
 async function loadUsuarios() {
   const body = document.getElementById('users-body');
   body.innerHTML = '<div class="empty-state" style="padding:24px">Cargando…</div>';
-  const { data, error } = await sb
+  const q = sb
     .from('profiles')
-    .select('id, nombre, email, rol, created_at')
-    .order('created_at', { ascending: false });
-  if (error) { body.innerHTML = '<div class="empty-state" style="padding:24px">Error: ' + error.message + '</div>'; return; }
+    .select('id, nombre, email, rol, cliente_id, created_at, clientes!profiles_cliente_id_fkey(nombre)');
+  const { data, error } = await porCliente(q).order('created_at', { ascending: false });
+  if (error) { body.innerHTML = '<div class="empty-state" style="padding:24px">Error: ' + esc(error.message) + '</div>'; return; }
   if (!data?.length) { body.innerHTML = '<div class="empty-state" style="padding:24px">Sin usuarios</div>'; return; }
   document.getElementById('users-sub').textContent = data.length + ' usuario' + (data.length !== 1 ? 's' : '') + ' registrado' + (data.length !== 1 ? 's' : '');
-  body.innerHTML = data.map(u => `
+
+  const badge = { superadmin: 'rol-super', admin: 'rol-admin', operador: 'rol-badge m-role-op', user: 'rol-user' };
+
+  body.innerHTML = data.map(u => {
+    // Que puede tocar cada uno. Es solo la interfaz: la base vuelve a
+    // validar todo en asignar_usuario / quitar_usuario.
+    const propio = u.id === currentUser?.id;
+    const gestionable = !propio && u.rol !== 'superadmin' &&
+      (esSuper() || ['operador', 'user'].includes(u.rol));
+    const opciones = esSuper() ? ['admin', 'operador', 'user'] : ['operador', 'user'];
+
+    const celdaRol = gestionable
+      ? `<select class="rol-select" data-email="${esc(u.email)}" data-rol="${esc(u.rol)}"
+                 data-cliente="${esc(u.cliente_id || '')}" onchange="cambiarRolUsuario(this)">
+           ${opciones.map(o => `<option value="${o}"${o === u.rol ? ' selected' : ''}>${o}</option>`).join('')}
+         </select>`
+      : `<span class="rol-badge ${badge[u.rol] || 'rol-user'}">${esc(u.rol || 'user')}</span>`;
+
+    return `
     <div class="panel-row users">
-      <div style="font-size:13px;font-weight:500">${esc(u.nombre || '—')}</div>
-      <div style="font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace">${esc(u.email || '—')}</div>
-      <div><span class="rol-badge ${u.rol === 'admin' ? 'rol-admin' : u.rol === 'operador' ? 'rol-badge m-role-op' : 'rol-user'}">${u.rol || 'user'}</span></div>
+      <div>
+        <div style="font-size:13px;font-weight:500">${esc(u.nombre || '—')}${propio ? ' <span style="color:var(--text-3);font-size:11px">(tú)</span>' : ''}</div>
+        ${etiquetaCliente(u.clientes?.nombre)}
+      </div>
+      <div style="font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis">${esc(u.email || '—')}</div>
+      <div>${celdaRol}</div>
       <div style="font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace">${formatDate(u.created_at)}</div>
-    </div>`).join('');
+      <div>${gestionable ? `
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--red)"
+                data-email="${esc(u.email)}" onclick="quitarUsuario(this)">Quitar</button>` : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ── AUDITORÍA ─────────────────────────────────────── */
@@ -2142,9 +2278,10 @@ async function loadUsuarios() {
 async function loadMantenimientos() {
   const body = document.getElementById('mantenimientos-body');
   body.innerHTML = '<div class="empty-state" style="padding:24px">Cargando…</div>';
-  const { data, error } = await sb
+  const q = sb
     .from('mantenimientos')
-    .select('id, texto, estado, created_at, tags(nombre), profiles(nombre, email, rol)')
+    .select('id, texto, estado, created_at, tags(nombre), profiles(nombre, email, rol)');
+  const { data, error } = await porCliente(q)
     .order('created_at', { ascending: false })
     .limit(100);
   if (error) { body.innerHTML = '<div class="empty-state" style="padding:24px">Error: '+error.message+'</div>'; return; }
@@ -2167,9 +2304,10 @@ async function loadMantenimientos() {
 async function loadAuditoria() {
   const body = document.getElementById('audit-body');
   body.innerHTML = '<div class="empty-state" style="padding:24px">Cargando…</div>';
-  const { data, error } = await sb
+  const q = sb
     .from('audit_log')
-    .select('id, estado_anterior, estado_nuevo, created_at, profiles!audit_log_changed_by_fkey(nombre, email), lecturas!audit_log_lectura_id_fkey(tags(nombre))')
+    .select('id, estado_anterior, estado_nuevo, created_at, profiles!audit_log_changed_by_fkey(nombre, email), lecturas!audit_log_lectura_id_fkey(tags(nombre))');
+  const { data, error } = await porCliente(q)
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { body.innerHTML = '<div class="empty-state" style="padding:24px">Error: ' + error.message + '</div>'; return; }
@@ -2198,69 +2336,111 @@ async function loadAuditoria() {
 function openInviteModal() {
   const box = document.getElementById('invite-box');
   box.style.display = box.style.display === 'none' ? 'block' : 'none';
-  if (box.style.display === 'block') {
-    document.getElementById('invite-email').focus();
-    document.getElementById('invite-msg').textContent = '';
+  if (box.style.display !== 'block') return;
+
+  // Solo el superadmin designa administradores y elige cliente. El admin
+  // de cliente agrega siempre a su propia organizacion (lo impone la base).
+  document.getElementById('invite-rol-admin').hidden = !esSuper();
+  const wrap = document.getElementById('invite-cliente-wrap');
+  wrap.hidden = !esSuper();
+  if (esSuper()) {
+    const sel = document.getElementById('invite-cliente');
+    sel.innerHTML = clientesLista.filter(c => c.activo)
+      .map(c => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
+    if (filtroCliente) sel.value = filtroCliente;
   }
+  document.getElementById('invite-rol').value = 'operador';
+  document.getElementById('invite-email').focus();
+  document.getElementById('invite-msg').textContent = '';
 }
 function closeInviteModal() {
   document.getElementById('invite-box').style.display = 'none';
   document.getElementById('invite-email').value = '';
   document.getElementById('invite-msg').textContent = '';
 }
+
+/* Llama a la funcion segura de la base que asigna rol y cliente. Es la
+   unica forma de cambiar rol/cliente desde el navegador: esas columnas
+   no tienen permiso de UPDATE, a proposito. Los limites (que rol, que
+   cliente, sobre quien) los aplica la base, no esta pantalla. */
+function rpcAsignar(email, rol) {
+  const args = { p_email: email, p_rol: rol };
+  if (esSuper()) args.p_cliente = document.getElementById('invite-cliente').value || null;
+  return sb.rpc('asignar_usuario', args);
+}
+
 async function sendInvite() {
-  const email = document.getElementById('invite-email').value.trim();
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
   const rol   = document.getElementById('invite-rol').value;
   const msg   = document.getElementById('invite-msg');
   const btn   = document.getElementById('btn-invite');
+  const fin   = (color, texto) => {
+    msg.style.color = color; msg.textContent = texto;
+    btn.disabled = false; btn.textContent = 'Enviar invitación';
+  };
 
-  if (!email) { msg.style.color='var(--red)'; msg.textContent='Ingresa un correo válido'; return; }
+  if (!email || !email.includes('@')) return fin('var(--red)', 'Ingresa un correo válido');
+  if (esSuper() && !document.getElementById('invite-cliente').value)
+    return fin('var(--red)', 'Primero crea un cliente en Supabase');
 
   btn.disabled = true; btn.textContent = 'Enviando…';
   msg.style.color = 'var(--text-2)'; msg.textContent = '';
 
-  // Send magic link via Supabase
-  const { error } = await sb.auth.signInWithOtp({
+  // 1. Intentar asignar primero: si la cuenta existe y es de otro cliente,
+  //    se rechaza ANTES de mandarle un correo a nadie.
+  let { error } = await rpcAsignar(email, rol);
+  const noExiste = error && /no hay ninguna cuenta/i.test(error.message);
+  if (error && !noExiste) return fin('var(--red)', error.message);
+
+  // 2. Magic link: crea la cuenta si no existia, y le avisa que fue agregado.
+  const { error: otpErr } = await sb.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: 'https://IoTeknica.github.io/NFC_tracker/pwa.html',
       shouldCreateUser: true
     }
   });
+  if (otpErr) return fin('var(--red)', 'Error al enviar el correo: ' + otpErr.message);
 
-  if (error) {
-    msg.style.color = 'var(--red)';
-    msg.textContent = 'Error: ' + error.message;
-    btn.disabled = false; btn.textContent = 'Enviar invitación';
-    return;
+  // 3. Si la cuenta era nueva, recien ahora existe su perfil: asignar.
+  //    Un reintento por si el trigger que crea el perfil tarda.
+  if (noExiste) {
+    ({ error } = await rpcAsignar(email, rol));
+    if (error && /no hay ninguna cuenta/i.test(error.message)) {
+      await new Promise(r => setTimeout(r, 1500));
+      ({ error } = await rpcAsignar(email, rol));
+    }
+    if (error) return fin('var(--amber)',
+      'Correo enviado, pero no se pudo asignar: ' + error.message +
+      '. Vuelve a intentarlo en unos segundos.');
   }
 
-  // El rol NO se asigna desde aqui: 'authenticated' no tiene permiso de
-  // UPDATE sobre profiles.rol (ver el revoke en schema.sql), justamente
-  // para que nadie pueda auto-promoverse. El perfil lo crea el trigger
-  // handle_new_user con rol 'user' cuando el invitado entra por primera
-  // vez; el ascenso se hace por SQL.
-
-  msg.style.color = 'var(--accent)';
-  msg.textContent = '✓ Magic link enviado a ' + email;
-  btn.disabled = false; btn.textContent = 'Enviar invitación';
   document.getElementById('invite-email').value = '';
+  fin('var(--accent)', `✓ ${email} agregado como ${rol}. Le enviamos un enlace de acceso.`);
+  loadUsuarios();
+}
 
-  // El invitado entra siempre como 'user'. Si se pidio otro rol, dejamos
-  // el SQL listo para copiar.
-  if (rol !== 'user') {
-    const sql = `update public.profiles set rol = '${rol}' where email = '${email}';`;
-    msg.innerHTML = '✓ Magic link enviado a ' + esc(email) +
-      '<div style="margin-top:8px;color:var(--text-2);font-size:11px;line-height:1.5">' +
-      'Entrará como <b>user</b>. Para dejarlo como <b>' + esc(rol) + '</b>, corre esto en Supabase ' +
-      'después de su primer ingreso:' +
-      '<div style="margin-top:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);' +
-      'border-radius:6px;font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text);' +
-      'user-select:all;cursor:text;word-break:break-all">' + esc(sql) + '</div></div>';
-  }
+/* Cambiar el rol de alguien de la organizacion, o sacarlo de ella. */
+async function cambiarRolUsuario(sel) {
+  const email = sel.dataset.email, previo = sel.dataset.rol, rol = sel.value;
+  if (rol === previo) return;
+  sel.disabled = true;
+  const args = { p_email: email, p_rol: rol };
+  if (esSuper()) args.p_cliente = sel.dataset.cliente || null;
+  const { error } = await sb.rpc('asignar_usuario', args);
+  if (error) { showToast('No se pudo cambiar el rol: ' + error.message, true); sel.value = previo; sel.disabled = false; return; }
+  showToast(`${email} ahora es ${rol}`);
+  loadUsuarios();
+}
 
-  // Reload users list
-  setTimeout(() => loadUsuarios(), 1500);
+async function quitarUsuario(btn) {
+  const email = btn.dataset.email;
+  if (!confirm(`¿Quitar a ${email} de la organización?\n\nDeja de ver todo de inmediato. Su historial de lecturas se conserva.`)) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc('quitar_usuario', { p_email: email });
+  if (error) { showToast('No se pudo quitar: ' + error.message, true); btn.disabled = false; return; }
+  showToast(`${email} quitado de la organización`);
+  loadUsuarios();
 }
 
 
@@ -2322,7 +2502,7 @@ function closeFotoPanel() {
    antes y la fila fallara, quedaria una foto fantasma en el panel
    apuntando a un objeto inexistente. */
 async function deleteFoto(btn) {
-  if (currentRole !== 'admin') return;
+  if (!esAdmin()) return;
   const id = btn.dataset.id, path = btn.dataset.path;
   if (!confirm('¿Eliminar esta foto?\n\nNo se puede deshacer.')) return;
 
@@ -2415,7 +2595,7 @@ async function loadFotoPanel(tagId) {
                    data-full="${esc(urls[f.path] || '')}"
                    onerror="if(this.src!==this.dataset.full)this.src=this.dataset.full"
                    alt="Foto del punto" loading="lazy">
-              ${currentRole === 'admin' ? `
+              ${esAdmin() ? `
               <button class="foto-thumb-del" title="Eliminar foto"
                 data-id="${esc(f.id)}" data-path="${esc(f.path)}"
                 onclick="event.stopPropagation();deleteFoto(this)">✕</button>` : ''}
@@ -2474,7 +2654,7 @@ async function loadMaintPanel(tagId) {
 
   document.getElementById('maint-panel-sub').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
 
-  const isAdmin = currentRole === 'admin';
+  const isAdmin = esAdmin();
   const pills = { borrador: 'm-borrador', aprobado: 'm-aprobado', rechazado: 'm-rechazado' };
 
   body.innerHTML = data.map(m => {

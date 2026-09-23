@@ -381,6 +381,13 @@ body{overflow-x:hidden}
         <div class="aslbl">③ Lugar donde se instala</div>
         <input class="ainp" type="text" id="a-lugar" placeholder="Ej: Sala de servidores piso 2">
 
+        <!-- Solo superadmin: el admin de un cliente registra siempre en el suyo
+             (lo asigna la base, no este formulario) -->
+        <div id="a-cliente-wrap" style="display:none">
+          <div class="aslbl">④ Cliente al que pertenece</div>
+          <select class="ainp" id="a-cliente"></select>
+        </div>
+
         <button class="abtn" id="btn-reg" onclick="registerTag()">Guardar tag en base de datos</button>
         <div class="ast" id="reg-st"></div>
 
@@ -424,7 +431,15 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
 let currentRole = 'user';
+let currentCliente = null;  // uuid del cliente; null para superadmin o cuenta pendiente
 let pendingUID  = null;   // UID from URL when not yet logged in
+
+/* Roles: superadmin (IoTeknica) y, por cliente, admin / operador / user.
+   Esto solo decide que botones mostrar: lo que cada uno puede hacer de
+   verdad lo valida la base (RLS y triggers). */
+const esSuper  = () => currentRole === 'superadmin';
+const esAdmin  = () => currentRole === 'admin' || currentRole === 'superadmin';
+const esEquipo = () => ['superadmin', 'admin', 'operador'].includes(currentRole);
 let currentTagId = null; // tag_id of last scanned tag
 let currentLecturaId = null; // id de la lectura recien registrada (para las fotos)
 
@@ -479,18 +494,25 @@ async function afterLogin(user) {
   qs('#scr-app').classList.add('show');
 
   try {
-    const {data: p} = await sb.from('profiles').select('nombre,rol').eq('id', user.id).maybeSingle();
+    const {data: p} = await sb.from('profiles').select('nombre,rol,cliente_id').eq('id', user.id).maybeSingle();
     currentRole = p?.rol || 'user';
+    currentCliente = p?.cliente_id || null;
     const nombre = p?.nombre || user.email.split('@')[0];
     const ini = nombre.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
     qs('#hname').textContent = nombre;
     qs('#hrole').textContent = '● ' + currentRole;
-    qs('#hrole').style.color = currentRole === 'admin' ? 'var(--am)' : 'var(--tx3)';
+    qs('#hrole').style.color = esAdmin() ? 'var(--am)' : 'var(--tx3)';
     const av = qs('#hav'); av.textContent = ini;
-    av.className = 'uav ' + (currentRole === 'admin' ? 'adm' : 'usr');
-    if (currentRole === 'admin') {
+    av.className = 'uav ' + (esAdmin() ? 'adm' : 'usr');
+    if (esAdmin()) {
       qs('#tab-admin').style.display = '';
+      if (esSuper()) await cargarClientesRegistro();
       loadAdminTags();
+    }
+    // Cuenta recien creada, todavia sin organizacion: no vera nada.
+    if (!esSuper() && !currentCliente) {
+      qs('#hrole').textContent = '● pendiente de asignar';
+      qs('#hrole').style.color = 'var(--am)';
     }
   } catch(e) { console.warn('profile:', e); }
 
@@ -598,7 +620,9 @@ async function processTagRead(uid) {
 
   setReadState('success',
     tag ? '✓ ' + tag.nombre : '✓ Tag detectado',
-    tag ? tag.lugar : '⚠ UID: ' + uid + ' — registra este tag en el panel Admin'
+    tag ? tag.lugar : (esAdmin()
+      ? '⚠ UID: ' + uid + ' — registra este tag en el panel Admin'
+      : '⚠ UID: ' + uid + ' — tag no registrado o no pertenece a tu organización')
   );
 
   qs('#rd-uid').textContent    = uid;
@@ -609,7 +633,7 @@ async function processTagRead(uid) {
   qs('#rd-card').style.display = 'block';
 
   // If tag not registered and user is admin, pre-fill admin form
-  if (!tag && currentRole === 'admin') {
+  if (!tag && esAdmin()) {
     qs('#a-uid').value = uid;
     updateTagURL();
   }
@@ -622,7 +646,7 @@ async function processTagRead(uid) {
     await loadMaintenance(tag.id);
     qs('#maint-section').style.display = 'block';
     // Show add button only for operador and admin
-    const canAdd = ['admin','operador'].includes(currentRole);
+    const canAdd = esEquipo();
     qs('#btn-add-maint').style.display = canAdd ? 'block' : 'none';
 
     // Fotos: mismo criterio de rol que mantenimiento
@@ -1012,18 +1036,42 @@ async function registerTag() {
   qs('#btn-reg').disabled = true;
   setRegSt('', 'Guardando…');
 
+  let cliente_id;
+  if (esSuper()) {
+    cliente_id = qs('#a-cliente').value;
+    if (!cliente_id) { qs('#btn-reg').disabled = false; return setRegSt('er', 'Elige el cliente del tag'); }
+  }
+
+  // Solo encuentra tags que este usuario puede ver: los de su cliente.
   const {data: existing} = await sb.from('tags').select('id').eq('uid', uid).maybeSingle();
   let error;
   if (existing) {
     ({error} = await sb.from('tags').update({nombre, lugar, updated_at: new Date().toISOString()}).eq('uid', uid));
   } else {
-    ({error} = await sb.from('tags').insert({uid, nombre, lugar, created_by: currentUser.id}));
+    const nuevo = {uid, nombre, lugar, created_by: currentUser.id};
+    if (cliente_id) nuevo.cliente_id = cliente_id;   // si no, la base pone el del admin
+    ({error} = await sb.from('tags').insert(nuevo));
   }
 
   qs('#btn-reg').disabled = false;
-  if (error) { setRegSt('er', 'Error: ' + error.message); return; }
+  if (error) {
+    // El UID es unico en todo el sistema. Si choca con un tag que este
+    // usuario no ve, es de otro cliente: no decir de cual.
+    const dup = error.code === '23505' || /duplicate key|tags_uid_key/i.test(error.message);
+    setRegSt('er', dup ? 'Ese UID ya está en uso' : 'Error: ' + error.message);
+    return;
+  }
   setRegSt('ok', existing ? '✓ Tag actualizado' : '✓ Tag registrado en BD');
   loadAdminTags();
+}
+
+/* Superadmin: lista de clientes para registrar tags */
+async function cargarClientesRegistro() {
+  const {data, error} = await sb.from('clientes').select('id,nombre').eq('activo', true).order('nombre');
+  if (error) { console.warn('clientes:', error.message); return; }
+  qs('#a-cliente').innerHTML = '<option value="">— Elige un cliente —</option>' +
+    (data || []).map(c => `<option value="${c.id}">${c.nombre.replace(/[<>&"]/g, '')}</option>`).join('');
+  qs('#a-cliente-wrap').style.display = '';
 }
 
 function setRegSt(cls, txt) {
