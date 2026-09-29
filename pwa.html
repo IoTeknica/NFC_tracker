@@ -2,9 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<!-- viewport-fit=cover: en iPhone la pagina ocupa tambien la zona del notch
+     y de la barra de inicio; los margenes los ponen los env(safe-area-inset-*).
+     maximum-scale=1: evita que Safari haga zoom al tocar un campo de texto
+     (lo hace con letra menor a 16px). iOS ignora user-scalable=no y deja
+     pellizcar igual; en Android no cambia nada. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0c0e12">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NFC Tracker">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>NFC Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -22,7 +30,9 @@ body{overflow-x:hidden}
 @keyframes ldanim{0%{width:0;margin-left:0}50%{width:100%}100%{width:0;margin-left:100%}}
 
 /* LOGIN */
-#scr-login{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:var(--bg)}
+/* 100vh en Safari incluye la zona tapada por la barra de direcciones; dvh
+   es la altura visible real. Se deja 100vh antes como respaldo. */
+#scr-login{display:none;min-height:100vh;min-height:100dvh;align-items:center;justify-content:center;padding:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) calc(20px + env(safe-area-inset-left,0px));background:var(--bg)}
 #scr-login.show{display:flex}
 .lbox{width:100%;max-width:360px;background:var(--sf);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:28px 24px}
 .lhd{display:flex;align-items:center;gap:12px;margin-bottom:24px}
@@ -44,9 +54,9 @@ body{overflow-x:hidden}
 .alrt.show{display:block}
 
 /* APP */
-#scr-app{display:none;flex-direction:column;min-height:100vh}
+#scr-app{display:none;flex-direction:column;min-height:100vh;min-height:100dvh}
 #scr-app.show{display:flex}
-.hdr{display:flex;align-items:center;padding:12px 16px;background:var(--sf);border-bottom:1px solid var(--br);gap:10px;position:sticky;top:0;z-index:10}
+.hdr{display:flex;align-items:center;padding:calc(12px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) 12px calc(16px + env(safe-area-inset-left,0px));background:var(--sf);border-bottom:1px solid var(--br);gap:10px;position:sticky;top:0;z-index:10}
 .hdr-logo{font-family:"Syne",sans-serif;font-size:15px;font-weight:800;flex:1}
 .hdr-logo span{color:var(--ac)}
 .uchip{display:flex;align-items:center;gap:7px;background:var(--sf2);border:1px solid var(--br);border-radius:20px;padding:4px 10px 4px 5px;cursor:pointer}
@@ -56,7 +66,7 @@ body{overflow-x:hidden}
 .uname{font-size:11px;font-weight:500}
 .urole{font-size:10px;font-family:"DM Mono",monospace}
 
-.scroll{flex:1;padding:16px}
+.scroll{flex:1;padding:16px calc(16px + env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))}
 
 /* TABS */
 .tabs{display:flex;gap:5px;background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:4px;margin-bottom:16px}
@@ -66,7 +76,7 @@ body{overflow-x:hidden}
 .tab-pane.active{display:block}
 
 /* AUTO-READ SCREEN */
-#scr-reading{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);flex-direction:column;align-items:center;padding:20px 20px 40px;text-align:center;overflow-y:auto}
+#scr-reading{display:none;position:fixed;inset:0;z-index:200;background:var(--bg);flex-direction:column;align-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-right,0px)) calc(40px + env(safe-area-inset-bottom,0px)) calc(20px + env(safe-area-inset-left,0px));text-align:center;overflow-y:auto}
 #scr-reading.show{display:flex}
 .rd-circle{width:120px;height:120px;border-radius:50%;margin-bottom:24px;display:flex;align-items:center;justify-content:center;position:relative}
 .rd-circle.loading{background:var(--acd);border:1.5px solid rgba(79,255,176,.3);animation:rpulse 1.5s ease-in-out infinite}
@@ -212,7 +222,7 @@ body{overflow-x:hidden}
 <!-- AUTO-READ OVERLAY -->
 
 <!-- SET PASSWORD -->
-<div id="scr-pwd" style="display:none;position:fixed;inset:0;z-index:150;background:var(--bg);align-items:center;justify-content:center;padding:20px">
+<div id="scr-pwd" style="display:none;position:fixed;inset:0;z-index:150;background:var(--bg);align-items:center;justify-content:center;padding:calc(20px + env(safe-area-inset-top,0px)) calc(20px + env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) calc(20px + env(safe-area-inset-left,0px))">
   <div style="width:100%;max-width:360px;background:var(--sf);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:28px 24px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
       <div style="width:40px;height:40px;border-radius:10px;background:var(--acd);border:1px solid rgba(79,255,176,.2);display:flex;align-items:center;justify-content:center">
@@ -842,21 +852,78 @@ function abrirCamara() {
 }
 
 /* Una foto de celular pesa entre 3 y 12 MB. Sin esto, 5 fotos son
-   hasta 60 MB subidos con datos moviles desde terreno. */
+   hasta 60 MB subidos con datos moviles desde terreno.
+
+   Safari (iPhone) tiene un tope de memoria por lienzo: si se pasa, NO
+   lanza error, deja el lienzo transparente y toBlob entrega una foto
+   negra que se subiria como valida. Por eso:
+   - se reduce por pasos (a la mitad cada vez), sin que ningun lienzo
+     intermedio supere AREA_MAX; ademas da mejor nitidez que un salto;
+   - cada lienzo intermedio se libera con width = 0 (Safari no suelta
+     la memoria hasta que se hace eso);
+   - al final se comprueba que el lienzo tenga pixeles. Se mira el canal
+     alfa, no el color: una foto oscura de verdad es opaca, un lienzo
+     fallido es transparente. */
+const AREA_MAX = 16000000;   // px por lienzo; iOS corta en 16.777.216
+
+function lienzo(w, h) {
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  return [cv, cx];
+}
+
+function lienzoVacio(cv) {
+  // Se reduce a 8x8 y se revisa si algun pixel tiene alfa
+  const [m, mx] = lienzo(8, 8);
+  mx.drawImage(cv, 0, 0, 8, 8);
+  const d = mx.getImageData(0, 0, 8, 8).data;
+  m.width = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return false;
+  return true;
+}
+
 function comprimir(file, lado = LADO_MAX, calidad = CALIDAD) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      let {width: w, height: h} = img;
-      const escala = Math.min(1, lado / Math.max(w, h));
-      w = Math.round(w * escala); h = Math.round(h * escala);
-      const cv = document.createElement('canvas');
-      cv.width = w; cv.height = h;
-      cv.getContext('2d').drawImage(img, 0, 0, w, h);
-      cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la imagen')),
-                'image/jpeg', calidad);
+      try {
+        const W = img.naturalWidth, H = img.naturalHeight;
+        if (!W || !H) throw new Error('Archivo de imagen no válido');
+        const escala = Math.min(1, lado / Math.max(W, H));
+        const wf = Math.round(W * escala), hf = Math.round(H * escala);
+
+        let src = img, w = W, h = H;
+        // Pasos intermedios: mientras falte mas de la mitad para llegar
+        while (w / 2 > wf) {
+          let nw = Math.round(w / 2), nh = Math.round(h / 2);
+          if (nw * nh > AREA_MAX) {
+            const k = Math.sqrt(AREA_MAX / (nw * nh));
+            nw = Math.floor(nw * k); nh = Math.floor(nh * k);
+          }
+          const [cv, cx] = lienzo(nw, nh);
+          cx.drawImage(src, 0, 0, nw, nh);
+          if (src !== img) src.width = 0;
+          src = cv; w = nw; h = nh;
+        }
+
+        const [cv, cx] = lienzo(wf, hf);
+        cx.drawImage(src, 0, 0, wf, hf);
+        if (src !== img) src.width = 0;
+
+        if (lienzoVacio(cv)) {
+          cv.width = 0;
+          throw new Error('la foto quedó en blanco al procesarla. Toma otra; si se repite, baja la resolución de la cámara');
+        }
+        cv.toBlob(b => {
+          cv.width = 0;
+          b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'));
+        }, 'image/jpeg', calidad);
+      } catch (e) { reject(e); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Archivo de imagen no válido')); };
     img.src = url;

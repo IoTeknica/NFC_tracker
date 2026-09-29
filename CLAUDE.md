@@ -20,7 +20,8 @@ HTML autocontenidos (HTML + CSS + JS inline) que hablan directo con Supabase
 via `@supabase/supabase-js@2` cargado por CDN. Cualquier cambio se despliega
 subiendo el archivo a GitHub.
 
-El unico recurso externo propio es `ioteknica-logo.png`, el logo de la barra
+Hay dos imagenes propias: `apple-touch-icon.png`, el icono de la PWA en
+iPhone (ver "Soporte iPhone"), e `ioteknica-logo.png`, el logo de la barra
 lateral del dashboard. Va junto a los HTML y se referencia con ruta relativa;
 si se mueve o no se sube, el `<img>` cae al texto del `alt`. El archivo esta
 a 3x (369x120) para pantallas retina y se muestra a 123x40. Se genero a
@@ -212,6 +213,50 @@ cientos de fotos y traerlas todas en cada apertura es lento y caro.
 
 Pendiente: sin señal la subida falla. La cola offline sigue sin implementarse.
 
+## Soporte iPhone
+
+No hay version aparte ni app: iPhone XS o superior lee el tag NFC en segundo
+plano y abre Safari con la URL, igual que Android abre el navegador. Solo
+`pwa.html` se adapto; el dashboard no se usa desde el telefono.
+
+- **`comprimir()` reduce por pasos y rechaza lienzos vacios.** Safari tiene
+  un tope de memoria por lienzo (~16,7 MP); si se pasa NO lanza error: deja
+  el lienzo transparente y `toBlob` entrega una foto negra que se subiria
+  como valida. Ahora se reduce a la mitad por paso sin que ningun lienzo
+  supere `AREA_MAX` (16 MP), se liberan los intermedios con `width = 0`, y
+  al final `lienzoVacio()` revisa el canal alfa (no el color: una foto
+  oscura de verdad es opaca). Si esta vacio, la foto se rechaza con mensaje.
+- **`100dvh`** en `#scr-login` y `#scr-app`, con `100vh` antes de respaldo:
+  en Safari `100vh` incluye la zona que tapa la barra de direcciones.
+- **`viewport-fit=cover` + `env(safe-area-inset-*)`** en `.hdr`, `.scroll`,
+  `#scr-login`, `#scr-reading` y `#scr-pwd`, para el notch y la barra de
+  inicio. En Android `env()` vale 0 y no cambia nada.
+- **`maximum-scale=1` en el viewport**: sin eso Safari hace zoom al tocar un
+  campo con letra menor a 16px (los `.li` son de 14px). iOS ignora
+  `user-scalable=no` y deja pellizcar igual.
+- **`apple-touch-icon.png`** (180x180, junto a los HTML): el icono si se
+  agrega a la pantalla de inicio. Es el mismo icono de tarjeta del login.
+
+Cosas de Safari que la app no puede resolver, para saberlas en soporte:
+
+- **Safari (ITP) borra la sesion tras 7 dias sin usar el sitio.** El
+  operador tendra que volver a iniciar sesion. En Android no pasa.
+- **Iniciar sesion en Safari, no en la app de correo.** El tag siempre abre
+  Safari. Si el magic link se abre en el navegador interno de Gmail u
+  Outlook, la sesion queda ahi y Safari sigue sin sesion. Lo mas simple es
+  entrar con correo y contrasena directo en Safari.
+- **No sirve "Agregar a inicio" para leer tags.** El icono de inicio tiene
+  su propio almacenamiento, separado de Safari, y el tag abre Safari de
+  todas formas.
+- **Ubicacion:** si el GPS sale "No obtenido", revisar Ajustes → Privacidad
+  → Localizacion → Sitios web de Safari.
+
+**Falta probar en un iPhone real**, despues de publicar:
+1. Acercar un tag: que abra Safari y registre la lectura.
+2. Que `capture` abra la camara y no un selector de archivos.
+3. Foto vertical y foto horizontal: que no salgan negras ni rotadas.
+4. Que el encabezado no quede bajo el notch ni la barra de estado.
+
 ## Trampas conocidas
 
 Cosas que ya costaron tiempo y no conviene volver a descubrir:
@@ -299,19 +344,8 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
   consulta para mover un tag (tag + lecturas + mantenimientos + fotos +
   auditoria en un solo WITH) esta al pie de `migracion_clientes.sql`. Mover un
   tag no mueve a sus operadores: hay que reasignarlos en Usuarios.
-- **Soporte iPhone (plan listo, sin ejecutar).** No hace falta version
-  aparte: iPhone XS o superior lee el tag NFC en segundo plano y abre Safari
-  con la URL, sin app. Alcance acordado: solo `pwa.html`. Corregir:
-  1. CRITICO — `comprimir()`: fotos de 48 MP pueden dar un canvas en negro
-     SIN error en Safari (tope de memoria de canvas) y se subiria una foto
-     vacia. Escalado por pasos + detectar lienzo vacio con getImageData.
-  2. `100vh` → `100dvh` en `#scr-login` y `#scr-app` (la barra de Safari corta).
-  3. `viewport-fit=cover` + `env(safe-area-inset-*)` en `.hdr` y `#scr-reading`.
-  4. Verificar en dispositivo si `capture` abre la camara o un selector.
-  5. Documentar: Safari (ITP) borra la sesion tras 7 dias sin uso.
-  6. Menores: `apple-touch-icon`; `user-scalable=no` es ignorado por iOS.
-  Solo se prueba en un iPhone real tras publicar: foto vertical y horizontal
-  (ni negras ni rotadas).
+- **iPhone: falta la prueba en dispositivo real** (ver seccion "Soporte
+  iPhone"). Los cambios estan hechos y probados en local, no en un iPhone.
 - **API para integracion de clientes.** El requisito previo (multi-cliente)
   ya esta hecho y verificado. Diseno acordado: Supabase Edge Functions como
   capa intermedia, solo lectura, versionada (/v1/), API keys por cliente
