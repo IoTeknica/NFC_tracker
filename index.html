@@ -2262,11 +2262,13 @@ async function loadUsuarios() {
       <div>
         <div style="font-size:13px;font-weight:500">${esc(u.nombre || '—')}${propio ? ' <span style="color:var(--text-3);font-size:11px">(tú)</span>' : ''}</div>
         ${etiquetaCliente(u.clientes?.nombre)}
+        ${!u.cliente_id && u.rol !== 'superadmin'
+          ? '<div class="cliente-tag" style="color:var(--amber)">Sin organización</div>' : ''}
       </div>
       <div style="font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis">${esc(u.email || '—')}</div>
       <div>${celdaRol}</div>
       <div style="font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace">${formatDate(u.created_at)}</div>
-      <div>${gestionable ? `
+      <div>${gestionable && u.cliente_id ? `
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--red)"
                 data-email="${esc(u.email)}" onclick="quitarUsuario(this)">Quitar</button>` : ''}</div>
     </div>`;
@@ -2392,7 +2394,17 @@ async function sendInvite() {
   const noExiste = error && /no hay ninguna cuenta/i.test(error.message);
   if (error && !noExiste) return fin('var(--red)', error.message);
 
-  // 2. Magic link: crea la cuenta si no existia, y le avisa que fue agregado.
+  // Si la cuenta ya existia, la asignacion esta hecha y no hace falta
+  // correo: ya puede entrar. No se envia porque el correo incluido de
+  // Supabase permite muy pocos envios por hora, y se gastaban en avisos.
+  if (!noExiste) {
+    document.getElementById('invite-email').value = '';
+    fin('var(--accent)', `✓ ${email} ya tenía cuenta: ahora es ${rol}. Puede entrar a la app con su correo.`);
+    loadUsuarios();
+    return;
+  }
+
+  // 2. Magic link: es lo que crea la cuenta nueva.
   const { error: otpErr } = await sb.auth.signInWithOtp({
     email,
     options: {
@@ -2400,7 +2412,12 @@ async function sendInvite() {
       shouldCreateUser: true
     }
   });
-  if (otpErr) return fin('var(--red)', 'Error al enviar el correo: ' + otpErr.message);
+  if (otpErr) {
+    const limite = otpErr.status === 429 || /rate limit/i.test(otpErr.message);
+    return fin('var(--red)', limite
+      ? 'Supabase alcanzó su límite de correos por hora y no se pudo crear la cuenta. Espera una hora e inténtalo de nuevo.'
+      : 'Error al enviar el correo: ' + otpErr.message);
+  }
 
   // 3. Si la cuenta era nueva, recien ahora existe su perfil: asignar.
   //    Un reintento por si el trigger que crea el perfil tarda.
@@ -2435,11 +2452,11 @@ async function cambiarRolUsuario(sel) {
 
 async function quitarUsuario(btn) {
   const email = btn.dataset.email;
-  if (!confirm(`¿Quitar a ${email} de la organización?\n\nDeja de ver todo de inmediato. Su historial de lecturas se conserva.`)) return;
+  if (!confirm(`¿Quitar a ${email} de la organización?\n\nDeja de ver todo de inmediato. Su historial de lecturas se conserva.\nLa cuenta no se borra: queda sin organización y se puede volver a asignar.`)) return;
   btn.disabled = true;
   const { error } = await sb.rpc('quitar_usuario', { p_email: email });
   if (error) { showToast('No se pudo quitar: ' + error.message, true); btn.disabled = false; return; }
-  showToast(`${email} quitado de la organización`);
+  showToast(`${email} quitado de la organización (queda sin organización)`);
   loadUsuarios();
 }
 

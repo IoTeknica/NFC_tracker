@@ -239,6 +239,11 @@ plano y abre Safari con la URL, igual que Android abre el navegador. Solo
 
 Cosas de Safari que la app no puede resolver, para saberlas en soporte:
 
+- **Al acercar el tag hay que tocar una notificacion.** iOS no abre la URL
+  directo como Android: muestra un aviso arriba y la abre en Safari solo al
+  tocarlo. Lo impone Apple para cualquier tag leido en segundo plano; ni
+  una app nativa lo evita. Confirmado en iPhone 14.
+
 - **Safari (ITP) borra la sesion tras 7 dias sin usar el sitio.** El
   operador tendra que volver a iniciar sesion. En Android no pasa.
 - **Iniciar sesion en Safari, no en la app de correo.** El tag siempre abre
@@ -316,6 +321,16 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
   sesion no persiste. Usar Chrome.
 - **Borrar una lectura falla** si tiene filas en `audit_log`. El FK esta con
   `ON DELETE SET NULL` para permitirlo.
+- **"Quitar" un usuario no borra la cuenta.** La devuelve a `user` sin
+  cliente: deja de ver todo y conserva su historial. El superadmin la sigue
+  viendo en Usuarios con la etiqueta "Sin organizacion"; se reasigna desde
+  ahi mismo. Borrar la cuenta de verdad solo se puede en el panel de
+  Supabase (Authentication → Users), y falla si tiene lecturas.
+- **El correo incluido de Supabase permite muy pocos envios por hora**
+  ("email rate limit exceeded"). Por eso la invitacion solo manda correo
+  cuando la cuenta es nueva (el magic link es lo que la crea); a una cuenta
+  existente solo se le asigna el rol. Si se invita a mucha gente, configurar
+  un SMTP propio en Supabase (Authentication → Emails → SMTP Settings).
 - **Supabase pausa el proyecto** tras 7 dias sin actividad en el plan free. Hay
   un monitor en UptimeRobot pingeando para evitarlo.
 - **El mapa NO usa CARTO.** Desde agosto 2026 CARTO exige API key en
