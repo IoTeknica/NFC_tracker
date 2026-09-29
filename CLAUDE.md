@@ -336,6 +336,9 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
   `#view-*`. Agregar una vista implica: div nuevo, item en el sidebar, entrada
   en el array de `switchView` y en el objeto `titles`.
 - Sin localStorage para datos de sesion (lo maneja el cliente de Supabase).
+  La unica clave propia es `nfc_uid_pendiente`: el tag leido sin sesion,
+  para que sobreviva al magic link (que abre otra pestana). Caduca a los
+  10 minutos y se borra al iniciar sesion.
 
 ## Pendientes / ideas
 

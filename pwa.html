@@ -450,6 +450,25 @@ let pendingUID  = null;   // UID from URL when not yet logged in
 const esSuper  = () => currentRole === 'superadmin';
 const esAdmin  = () => currentRole === 'admin' || currentRole === 'superadmin';
 const esEquipo = () => ['superadmin', 'admin', 'operador'].includes(currentRole);
+
+/* UID de un tag leido sin sesion. Se guarda en localStorage (no es dato
+   de sesion, es el tag pendiente) para que sobreviva al magic link, que
+   abre otra pestana. Caduca a los 10 minutos: pasado eso, la lectura ya
+   no corresponde a donde esta el operador. */
+const UID_PENDIENTE_MIN = 10;
+function guardarUIDPendiente(uid) {
+  try { localStorage.setItem('nfc_uid_pendiente', JSON.stringify({uid, t: Date.now()})); } catch (e) {}
+}
+function recuperarUIDPendiente() {
+  try {
+    const p = JSON.parse(localStorage.getItem('nfc_uid_pendiente') || 'null');
+    if (p?.uid && Date.now() - p.t < UID_PENDIENTE_MIN * 60000) return p.uid;
+  } catch (e) {}
+  return null;
+}
+function borrarUIDPendiente() {
+  try { localStorage.removeItem('nfc_uid_pendiente'); } catch (e) {}
+}
 let currentTagId = null; // tag_id of last scanned tag
 let currentLecturaId = null; // id de la lectura recien registrada (para las fotos)
 
@@ -462,6 +481,7 @@ async function init() {
   const uid = params.get('uid');
   if (uid) {
     pendingUID = uid.toUpperCase();
+    guardarUIDPendiente(pendingUID);
     // Clean URL so refresh doesn't re-trigger
     history.replaceState({}, '', window.location.pathname);
   }
@@ -480,9 +500,16 @@ async function init() {
 
   hide('scr-loading');
   show('scr-login');
+  if (pendingUID) showAlert('o', 'Tag ' + pendingUID + ' detectado — inicia sesión para registrarlo');
 
+  // INITIAL_SESSION y TOKEN_REFRESHED cubren el caso en que getSession()
+  // tardo mas que el timeout (datos moviles lentos) pero la sesion existia:
+  // sin esto se quedaba en el login aunque el usuario ya estuviera dentro.
+  // Solo se registra si getSession() no encontro sesion, asi que no hay loop.
   sb.auth.onAuthStateChange(async (ev, s) => {
-    if (ev === 'SIGNED_IN' && s && !qs('#scr-app').classList.contains('show')) {
+    if (['SIGNED_IN', 'INITIAL_SESSION', 'TOKEN_REFRESHED'].includes(ev) && s
+        && !qs('#scr-app').classList.contains('show')
+        && qs('#scr-pwd').style.display !== 'flex') {
       await afterLogin(s.user);
     }
     if (ev === 'SIGNED_OUT') {
@@ -527,6 +554,11 @@ async function afterLogin(user) {
   } catch(e) { console.warn('profile:', e); }
 
   loadHistory();
+
+  // El magic link abre una pestana nueva: el UID del tag que llevo al
+  // login quedo en la otra. Se recupera del almacenamiento del navegador.
+  if (!pendingUID) pendingUID = recuperarUIDPendiente();
+  borrarUIDPendiente();
 
   // If came from magic link → show password setup
   if (sessionStorage.getItem('nfc_from_magic') === 'true') {
