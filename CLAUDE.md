@@ -315,6 +315,15 @@ Cosas que ya costaron tiempo y no conviene volver a descubrir:
 - **`getSession()` y `onAuthStateChange` juntos causan loop.** Solo uno maneja
   el arranque. `getSession()` ya procesa el token del magic link que viene en
   el hash de la URL.
+- **En `pwa.html`, `show()`/`hide()` y la clase `.show` no se mezclan.** Las
+  funciones escriben `display` directo en el elemento y eso gana sobre la
+  clase: `classList.remove('show')` no oculta algo que `show()` ya mostro. Asi
+  quedaba el login visible tras un inicio de sesion nuevo (la app aparecia
+  debajo, fuera de vista); solo ocurria sin sesion previa, por eso tardo en
+  verse. Para ocultar algo mostrado con `show()`, usar `hide()`.
+- **`closeModal()` reinicia `selSt` y `editId`.** Cualquier cosa que los
+  necesite (como el aviso de "estado actualizado") debe leerlos antes de
+  llamarla.
 - **`position: fixed` no funciona** dentro del iframe del preview. Los modales
   son paneles inline en el flujo normal.
 - **Edge bloquea el storage de Supabase** con su tracking prevention y la

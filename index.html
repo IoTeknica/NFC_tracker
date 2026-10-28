@@ -1652,13 +1652,16 @@ async function guardarEstado() {
   // Update in allHistorial (historial view)
   const rh = allHistorial.find(x => x.id === editId);
   if (rh) rh.estado = selSt;
+  // closeModal() reinicia selSt: guardar el estado antes, para el aviso de abajo
+  // (decia "estado actualizado a null").
+  const estadoNuevo = selSt;
   closeModal();
   renderTable(); updateKPIs();
   // drawMap() solo con la vista Tags visible: en otra vista su contenedor
   // esta en display:none y Leaflet se inicializaria midiendo 0x0.
   if (currentView === 'tags') drawMap();
   if (currentView === 'historial') filterHistorial();
-  showToast(`"${r?.tag || rh?.tag}" → estado actualizado a ${selSt}`);
+  showToast(`"${r?.tag || rh?.tag}" → estado actualizado a ${estadoNuevo}`);
 }
 
 let toastTimer;

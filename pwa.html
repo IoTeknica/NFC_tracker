@@ -527,6 +527,11 @@ async function init() {
 async function afterLogin(user) {
   currentUser = user;
   hide('scr-loading');
+  // hide() y no solo quitar la clase: init() muestra el login con show(), que
+  // escribe display:flex directo en el elemento, y eso no lo anula la clase.
+  // Sin esto, tras un inicio de sesion nuevo el login quedaba arriba y la app
+  // debajo, fuera de vista. Solo pasaba sin sesion previa.
+  hide('scr-login');
   qs('#scr-login').classList.remove('show');
   qs('#scr-app').classList.add('show');
 
